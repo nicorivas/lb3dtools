@@ -17,44 +17,71 @@ verbose = False
 # Global constants
 DATA_DIR = "/data/home/nicorivas/Data"
 #DATA_DIR = "/data/home/nicorivas/Code/lb3d"
-SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
-CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
+#SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
+SOURCE_DIR = "/Users/local_admin/Code/lb3d/src"
+#CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
+CONFIG_DIR = "/Users/local_admin/Code/lb3d"
 
 class Project:
-    name = ""
+    name = "" # name of the simulation, which is also directory name
     directory = "" # full path
     projectFilename = "" # project file, almost only a readme
     historyFilename = "" # history file name
     sc = 0
     sims = []
+    loaded = False
 
-    def __init__(self, name):
-        """Constructor also checks if directory exists, and depending on that
-           either creates new project or loads the existing one
+    def __init__(self):
+        """
+        Constructor does nothing, to enforce that the user does either new or load
+        to have the project.
         """
         if verbose:
-            print("Creating project "+str(name))
+            print("Project constructor "+str(name))
 
+    def new(self, name):
+        """
+        Given a name, it creates a project
+        """
         self.name = name
         self.directory = DATA_DIR+"/"+name
-        print(self.directory)
+        if os.path.exists(self.directory):
+            print("Project already exists! Use .load() to load a project")
+            return 1
         self.projectFilename = self.directory+'/project'
         self.historyFilename = self.directory+'/history'
 
-        """
-        if os.path.exists(self.directory):
-            print("Project already exists! So loading it")
-            self.load()
-        else:
-            print("Project didn't exist! So creating it")
-            os.makedirs(self.directory)
-            self.writeToFile('n.r. lb3d data project file')
-            self.writeToHistory('project created')
-        """
+        # CREATE DIRECTORY AND FILES
 
-    def load(self):
+        return self
+
+    def load(self, name):
+        self.name = name
+        self.directory = DATA_DIR+"/"+name
+        if not os.path.exists(self.directory):
+            print("Project does not exist! Create it?")
+            return 1
+        self.projectFilename = self.directory+'/project'
+        if not os.path.isfile(self.projectFilename):
+            print("Project file not found. Are you sure is this a project directory? Aborting")
+            return 1
+        self.historyFilename = self.directory+'/history'
+        if not os.path.isfile(self.historyFilename):
+            print("History file not found. Are you sure is this a project directory? Aborting")
+            return 1
         if verbose:
             print("Loaded project in "+self.directory)
+
+        self.loaded = True
+
+        # Look for simulations
+        directories = glob.glob(self.directory+"/*")
+        for dir in directories:
+            r = self.addSimulation(dir)
+            if r != 0:
+                print("WARNING: Directory "+dir+" is not a simulation!")
+
+        return self
 
     def writeToFile(self, string):
         file = open(self.projectFilename,'w')
@@ -70,40 +97,17 @@ class Project:
         file.write(str(time)+': '+string+'\n')
         file.close()
 
-    def addSimulation(self, _name, _template, _replace=False):
+    def addSimulation(self, name):
 
-        path = self.directory+"/"+_name
+        path = self.directory+"/"+name
 
-        if os.path.exists(path):
-            if _replace:
-                print("A simulation with that name already exists! Deleting it!")
-                shutil.rmtree(path)
-            else:
-                print("A simulation with that name already exists! So loading it")
-                return self.loadSimulation(_name, _template)
-
-        os.makedirs(self.directory+"/"+_name)
-
-        self.sims.append(Simulation(_name, self))
-
-        self.sims[self.sc].loadTemplate(DATA_DIR+"/"+_template)
-
-        self.writeToHistory("job "+self.sims[self.sc].name+" created")
-
-        self.sc += 1
-        return self.sims[self.sc-1]
-
-    def loadSimulation(self, _name, _template):
-        if not os.path.exists(self.directory+"/"+_name):
-            print("Simulation doesn't exists!")
-            exit(0)
-
-        self.sims.append(Simulation(_name, self))
-
-        self.sims[self.sc].loadTemplate(DATA_DIR+"/"+_template)
-
-        self.sc += 1
-        return self.sims[self.sc-1]
+        if not os.path.exists(path):
+            print("ERROR: Simulation path not found")
+            return 1
+        else:
+            sims.sims.append(Simulation.new(name, self))
+            self.sc += 1
+            return 0
 
     def __str__(self):
         return  "Project instance:\n"\
