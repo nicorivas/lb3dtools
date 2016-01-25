@@ -16,7 +16,8 @@ G_elec = False # if compiled with flag -DELEC
 # ==========================================================================
 # COMPILE
 # ==========================================================================
-def compile(platform, flags, configDir, sourceDir, out, clean=True, verbose=False):
+def compile(platform, flags, configDir, sourceDir, out, clean=True, 
+		verbose=False, debug=False):
 	"""
 	Runs the ./configLB3D.sh script according to the platform chosen.
 	"""
@@ -26,6 +27,8 @@ def compile(platform, flags, configDir, sourceDir, out, clean=True, verbose=Fals
 		print("Compiling: "+flags)
 
 	flags_ = string.split(flags)
+	if debug:
+		flags_.append("-DDEBUG")
 
 	if clean:
 		e = subprocess.call(["./configLB3D.sh", "CLEAN"], cwd=configDir, 
@@ -36,8 +39,9 @@ def compile(platform, flags, configDir, sourceDir, out, clean=True, verbose=Fals
 			stdout=out, stderr=out)
 
 	if e != 0:
-		print("Compiling failed!")
-		exit(2)
+		print("ERROR! Compiling failed!")
+	
+	return e
 
 # ============================================================================
 # RUN
@@ -70,13 +74,15 @@ def run(_procs, _runDir, _out, _verbose=False):
 # DEBUG
 # ============================================================================
 
-def debug(_procs, _runDir, _out, _verbose=False):
+def debug(_procs, _runDir, _out, _verbose=False, valgrind=False):
 	"""
 	Debugs the code using valgrind
 	"""
 	global mpirundir, G_exe
 
-	valgrind = '/apps/prod/HI-ERN/stow/valgrind-3.11.0/bin/valgrind --tool=callgrind'
+	valgrindArg = ''
+	if valgrind:
+		valgrindArg = '/apps/prod/HI-ERN/stow/valgrind-3.11.0/bin/valgrind --tool=callgrind'
 
 	if _verbose:
 		print("Running (debug mode):")
@@ -85,7 +91,7 @@ def debug(_procs, _runDir, _out, _verbose=False):
 	#e = subprocess.call([mpirundir+'mpirun -np '+str(_procs)+' ./lbe -f '+
 	#_input], cwd=_runDir, stdout=_out, stderr=_out, shell=True)
 	#command = mpirundir+'mpirun -np '+str(_procs)+' '+valgrind+' ./'+G_exe+' -f input'
-	command = mpirundir+'mpirun -np '+str(_procs)+' '+valgrind+' ./'+G_exe+' -f input'
+	command = mpirundir+'mpirun -np '+str(_procs)+' '+valgrindArg+' ./'+G_exe+' -f input'
 	e = subprocess.call([command], cwd=_runDir, stdout=_out, stderr=_out, shell=True)
 
 	if e != 0:
