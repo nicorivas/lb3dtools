@@ -32,7 +32,7 @@ class Project:
     """
 
     CLASS_NAME = 'Project'
-    DEBUG = True
+    DEBUG = False
 
     #--------------------------------------------------------------------------
 
@@ -116,7 +116,8 @@ class Project:
                 # Load simulations
                 r = self.addSimulation(dir)
                 if r == 0:
-                    self.message("Simulation loaded: '"+dir+"'")
+                    r;
+                    #self.message("Simulation loaded: '"+dir+"'")
             else:
                 # Found a file, if it's not project or history files, complain
                 filename = os.path.split(dir)[1]
@@ -230,7 +231,6 @@ class Simulation:
         self.platform = ""
         self.flags = ""
         self.inputFile = ""
-        self.procs = 1
         # key's are the field name (i.e. 'eps'), and it contains a list with all
         # the filenames of the respective field (for every time, and maybe also
         # run and name)
@@ -434,6 +434,7 @@ class Simulation:
                     self.message_debug(fn_)
             else:
                 self.warning("Field not found '"+fieldname+"'")
+                return -1
         else:
             self.error("Format not supported")
             return -1
@@ -513,19 +514,26 @@ class Simulation:
     #--------------------------------------------------------------------------
 
     def get(self, dicn, key):
+        """
+        Get a variable from the input files.
+        Select a dictionary with 'dicn', from input, input.elec, input.md, etc.
+        """
         if key in self.inputDicts[dicn].keys():
-           return self.inputDicts[dicn][key]
+            return self.inputDicts[dicn][key]
         else:
             self.error("Property key '"+key+"' not found")
             return -1
 
     #--------------------------------------------------------------------------
 
-    def queue(self):
+    def queue(self, procs=4, node='', nodes=1, tasks_per_node=24, exclusive=False):
         """
-        Instead of running, submits jobs to queue. This works by creating
-        a bash script that sbatch can understand, with parameters relevant
-        for the run
+        Instead of running, submits jobs to queue (SLURM). Creates a bash
+        script with SBATCH commands relevant for the run.
+        For SBATCH doc see https://computing.llnl.gov/linux/slurm/sbatch.html
+            @node: name of the node to be used in the cluster. This can be a
+                   list of names separated by commas.
+
         """
         if self.DEBUG:
             print(self.CLASS_NAME+"::queue()")
@@ -543,12 +551,23 @@ class Simulation:
         # Write sbatch queue
         f = open(batch_filename_, 'w')
         f.write('#!/bin/bash\n')
-        f.write('#SBATCH -n '+str(self.procs)+'\n')
-        f.write('#SBATCH -o debug-%N-%j.out\n')
-        f.write('#SBATCH -e debug-%N-%j.err\n')
-        f.write('#SBATCH -J '+self.name+'\n')
-        f.write('#SBATCH --get-user-env\n')
-        f.write('#SBATCH --time=24:00:00\n')
+        #f.write('#SBATCH --cpu_bind=rank\n') # needs plug-in
+        if exclusive:
+            f.write('#SBATCH --exclusive\n')
+            # don't share nodes with other procs
+        f.write('#SBATCH --nodes='+str(nodes)+'\n') # number of nodes to use
+        f.write('#SBATCH --ntasks='+str(procs)+'\n')
+            # number of total tasks, so 'x' if running ./mpirun -n x.
+        f.write('#SBATCH --ntasks-per-node='+str(tasks_per_node)+'\n')
+            # tasks per node; if this is set low enough the no hyperthreading
+            # takes place.
+        f.write('#SBATCH -o debug-%N-%j.out\n') # stdout redirect
+        f.write('#SBATCH -e debug-%N-%j.err\n') # stderr redirect
+        f.write('#SBATCH --job-name '+self.name+'\n') # name for queue (8c max)
+        #f.write('#SBATCH --get-user-env\n') # use env variables if set
+        f.write('#SBATCH --time=24:00:00\n') # max time: a day
+        if node is not '':
+            f.write('#SBATCH --nodelist='+node+'\n')
         #f.write('srun ./lbe -f input')
         f.write(lb_tools.run_command())
         f.close()
@@ -560,10 +579,11 @@ class Simulation:
         # And run it
         return_code_ = subprocess.call("sbatch "+batch_filename_, shell=True)
         if return_code_ != 0:
-            print("Something went wrong when calling sbatch. I quit!")
-            exit(1)
+            self.error("Something went wrong when calling sbatch.")
+            return return_code_
 
         self.project.writeToHistory("Batch file finished",sim=self.name)
+        return return_code_
 
     #--------------------------------------------------------------------------
 
@@ -579,6 +599,7 @@ class Simulation:
         if out == None:
             out = open(os.devnull,'w')
 
+        r = 1
         if not self.compiled:
             r = lb_tools.compile(self.platform, self.flags, CONFIG_DIR, SOURCE_DIR,
                 out, clean=clean, debug=debug, verbose=False)
@@ -587,19 +608,20 @@ class Simulation:
             else:
                 self.project.writeToHistory("Compiled source with flags "+str(self.flags),sim=self.name)
                 self.compiled = True
+        return r
 
     #--------------------------------------------------------------------------
 
-    def debug(self):
+    def debug(self, procs=4):
         """
         Call the lb_tools 'debug' routine with proper arguments. See doc there.
         """
         lb_tools.setMPI(self.platform)
-        lb_tools.debug(self.procs, self.directory, sys.stdout, False)
+        lb_tools.debug(procs, self.directory, sys.stdout, False)
 
     #--------------------------------------------------------------------------
 
-    def run(self,out=sys.stdout):
+    def run(self, procs=4, out=sys.stdout):
         """
         Call the lb_tools 'run' routine with proper arguments. See doc there.
         """
@@ -610,7 +632,7 @@ class Simulation:
             out = open(os.devnull,'w')
 
         lb_tools.setMPI(self.platform)
-        lb_tools.run(self.procs, self.directory, out, False)
+        lb_tools.run(procs, self.directory, out, False)
 
     #--------------------------------------------------------------------------
 

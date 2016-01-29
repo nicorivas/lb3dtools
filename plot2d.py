@@ -61,7 +61,7 @@ def plotProfile(_field, axes=['x','y'],label='',title=''):
 	xs = np.arange(0+step/2.0,lx,step)
 	ys = cut
 
-	plt.plot(xs, ys, label=label)
+	plt.plot(xs, ys, marker='o', label=label)
 	plt.title(title)
 	plt.xlabel(axes[0])
 	plt.ylabel(axes[1])
