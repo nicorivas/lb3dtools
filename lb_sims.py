@@ -15,11 +15,11 @@ import lb_tools # see module
 verbose = False
 
 # Global constants
-DATA_DIR = "/data/home/nicorivas/Data"
+DATA_DIR = "/homec/jiek11/jiek1101/Data"
 #DATA_DIR = "/data/home/nicorivas/Code/lb3d"
-SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
+SOURCE_DIR = "/homec/jiek11/jiek1101/Code/lb3d/src"
 #SOURCE_DIR = "/Users/local_admin/Code/lb3d/src"
-CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
+CONFIG_DIR = "/homec/jiek11/jiek1101/Code/lb3d"
 #CONFIG_DIR = "/Users/local_admin/Code/lb3d"
 
 class Project:
@@ -555,7 +555,7 @@ class Simulation:
         # !! Notice here that we set the directory to the simulation
         os.chdir(self.directory)
 
-        lb_tools.setMPI(self.platform)
+        foundmpi = lb_tools.setMPI(self.platform)
 
         batch_filename_ = self.project.name+'-'+self.name
 
@@ -570,17 +570,20 @@ class Simulation:
         f.write('#SBATCH --ntasks='+str(procs)+'\n')
             # number of total tasks, so 'x' if running ./mpirun -n x.
         f.write('#SBATCH --ntasks-per-node='+str(tasks_per_node)+'\n')
+        f.write('#SBATCH --cpus-per-task=1\n')
             # tasks per node; if this is set low enough the no hyperthreading
             # takes place.
-        f.write('#SBATCH -o debug-%N-%j.out\n') # stdout redirect
-        f.write('#SBATCH -e debug-%N-%j.err\n') # stderr redirect
+        f.write('#SBATCH --output debug-%N-%j.out\n') # stdout redirect
+        f.write('#SBATCH --error debug-%N-%j.err\n') # stderr redirect
         f.write('#SBATCH --job-name '+self.name+'\n') # name for queue (8c max)
         #f.write('#SBATCH --get-user-env\n') # use env variables if set
         f.write('#SBATCH --time='+time+'\n') # max time: a day
         if node is not '':
             f.write('#SBATCH --nodelist='+node+'\n')
-        #f.write('srun ./lbe -f input')
-        f.write(lb_tools.run_command())
+        if foundmpi:
+            f.write(lb_tools.run_command())
+        else:
+            f.write('srun ./lbe -f input')
         f.close()
 
         self.project.writeToHistory("Batch file created",sim=self.name)

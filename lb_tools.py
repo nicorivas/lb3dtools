@@ -3,8 +3,8 @@
 import os
 import sys # for sys.stdout
 import string
-import h5py
-import numpy as np
+#import h5py
+#import numpy as np
 import subprocess # used to run the code
 import shutil # to copy compiled executable with permissions
 import collections # for ordered dictionary, in input file reading/writing
@@ -47,7 +47,8 @@ def compile(platform, flags, configDir, sourceDir, out, clean=True,
 # RUN
 # ============================================================================
 def run_command():
-	return mpirundir+'mpirun ./'+G_exe+' -f input'
+	#return mpirundir+'mpirun ./'+G_exe+' -f input'
+	return mpirundir+'srun ./'+G_exe+' -f input'
 
 def run(_procs, _runDir, _out, _verbose=False):
 	"""
@@ -308,7 +309,8 @@ def setMPI(platform):
 	if not mpirunExists:
 		if not os.path.isfile(mpirundir+"/mpirun"):
 			print("Error: mpirun not found")
-			exit(0)
+			return 0
+	return 1
 
 def readHDF5(_file):
 	"""
