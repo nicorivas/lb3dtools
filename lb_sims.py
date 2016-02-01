@@ -110,6 +110,11 @@ class Project:
 
     #--------------------------------------------------------------------------
     def loadSimulations(self):
+        """
+        Load simulations take the currenct directory and adds all the
+        directories that are found to be a simulation. We complain for
+        non-project files in the directory. TODO: Should we?
+        """
         directories = glob.glob(self.directory+"/*")
         for dir in directories:
             if os.path.isdir(dir):
@@ -526,7 +531,13 @@ class Simulation:
 
     #--------------------------------------------------------------------------
 
-    def queue(self, procs=4, node='', nodes=1, tasks_per_node=24, exclusive=False):
+    def queue(self,
+            procs=4,
+            node='',
+            nodes=1,
+            tasks_per_node=24,
+            time='24:00:00',
+            exclusive=False):
         """
         Instead of running, submits jobs to queue (SLURM). Creates a bash
         script with SBATCH commands relevant for the run.
@@ -565,7 +576,7 @@ class Simulation:
         f.write('#SBATCH -e debug-%N-%j.err\n') # stderr redirect
         f.write('#SBATCH --job-name '+self.name+'\n') # name for queue (8c max)
         #f.write('#SBATCH --get-user-env\n') # use env variables if set
-        f.write('#SBATCH --time=24:00:00\n') # max time: a day
+        f.write('#SBATCH --time='+time+'\n') # max time: a day
         if node is not '':
             f.write('#SBATCH --nodelist='+node+'\n')
         #f.write('srun ./lbe -f input')
