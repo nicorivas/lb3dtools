@@ -15,11 +15,15 @@ import lb_tools # see module
 verbose = False
 
 # Global constants
-DATA_DIR = "/homec/jiek11/jiek1101/Data"
-#DATA_DIR = "/data/home/nicorivas/Code/lb3d"
-SOURCE_DIR = "/homec/jiek11/jiek1101/Code/lb3d/src"
+DATA_DIR = "/data/home/nicorivas/Data"
+#DATA_DIR = "/homec/jiek11/jiek1101/Data"
+
+SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
+#SOURCE_DIR = "/homec/jiek11/jiek1101/Code/lb3d/src"
 #SOURCE_DIR = "/Users/local_admin/Code/lb3d/src"
-CONFIG_DIR = "/homec/jiek11/jiek1101/Code/lb3d"
+
+CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
+#CONFIG_DIR = "/homec/jiek11/jiek1101/Code/lb3d"
 #CONFIG_DIR = "/Users/local_admin/Code/lb3d"
 
 class Project:
@@ -348,32 +352,40 @@ class Simulation:
                         'velx_od','vely_od','velz_od',
                         'force',
                         'Fx','Fy','Fz',
-                        'elec-rho_p','elec-rho_m','elec-phi',
+                        'elec-rho_p',
+                        'elec-rho_m',
+                        'elec-phi',
+                        'elec-eps',
                         'elec-Ex','elec-Ey','elec-Ez',
+                        'elec-init-post_eps',
                         'elec-init-post_rho_p',
                         'elec-init-post_rho_m',
                         'elec-init-post_phi',
                         'elec-init-post_Ex',
                         'elec-init-post_Ey',
                         'elec-init-post_Ez',
+                        'elec-eq_postPoisson_eps',
                         'elec-eq_postPoisson_rho_p',
                         'elec-eq_postPoisson_rho_m',
                         'elec-eq_postPoisson_phi',
                         'elec-eq_postPoisson_Ex',
                         'elec-eq_postPoisson_Ey',
                         'elec-eq_postPoisson_Ez',
+                        'elec-eq_postNoE_eps',
                         'elec-eq_postNoE_rho_p',
                         'elec-eq_postNoE_rho_m',
                         'elec-eq_postNoE_phi',
                         'elec-eq_postNoE_Ex',
                         'elec-eq_postNoE_Ey',
                         'elec-eq_postNoE_Ez',
+                        'elec-eq_init_eps',
                         'elec-eq_init_rho_p',
                         'elec-eq_init_rho_m',
                         'elec-eq_init_phi',
                         'elec-eq_init_Ex',
                         'elec-eq_init_Ey',
                         'elec-eq_init_Ez',
+                        'elec-eq_final_eps',
                         'elec-eq_final_rho_p',
                         'elec-eq_final_rho_m',
                         'elec-eq_final_phi',
@@ -425,6 +437,10 @@ class Simulation:
         """
         if self.DEBUG:
             self.message_debug(self.CLASS_NAME+"::getField(fieldname="+fieldname+")")
+
+        if self.fieldFiles.keys() == []:
+            self.error("Looks like you haven't loaded the output, use loadOutput")
+            return -1
 
         field_ = []
         if format == 'hdf5':
@@ -537,7 +553,8 @@ class Simulation:
             nodes=1,
             tasks_per_node=24,
             time='24:00:00',
-            exclusive=False):
+            exclusive=False,
+            debug=False):
         """
         Instead of running, submits jobs to queue (SLURM). Creates a bash
         script with SBATCH commands relevant for the run.
@@ -556,6 +573,7 @@ class Simulation:
         os.chdir(self.directory)
 
         foundmpi = lb_tools.setMPI(self.platform)
+        print(foundmpi)
 
         batch_filename_ = self.project.name+'-'+self.name
 
@@ -569,10 +587,12 @@ class Simulation:
         f.write('#SBATCH --nodes='+str(nodes)+'\n') # number of nodes to use
         f.write('#SBATCH --ntasks='+str(procs)+'\n')
             # number of total tasks, so 'x' if running ./mpirun -n x.
-        f.write('#SBATCH --ntasks-per-node='+str(tasks_per_node)+'\n')
-        f.write('#SBATCH --cpus-per-task=1\n')
+        #f.write('#SBATCH --ntasks-per-node='+str(tasks_per_node)+'\n')
             # tasks per node; if this is set low enough the no hyperthreading
-            # takes place.
+            # takes place. this should work, but simulations sometime crash
+        #f.write('#SBATCH --cpus-per-task=1\n')
+            # this should work, but simulations sometime crash before starting
+            # if set. i couldn't find the origin of the crash.
         f.write('#SBATCH --output debug-%N-%j.out\n') # stdout redirect
         f.write('#SBATCH --error debug-%N-%j.err\n') # stderr redirect
         f.write('#SBATCH --job-name '+self.name+'\n') # name for queue (8c max)
@@ -580,8 +600,8 @@ class Simulation:
         f.write('#SBATCH --time='+time+'\n') # max time: a day
         if node is not '':
             f.write('#SBATCH --nodelist='+node+'\n')
-        if foundmpi:
-            f.write(lb_tools.run_command())
+        if foundmpi==0:
+            f.write(lb_tools.run_command(debug=debug))
         else:
             f.write('srun ./lbe -f input')
         f.close()
@@ -626,12 +646,13 @@ class Simulation:
 
     #--------------------------------------------------------------------------
 
-    def debug(self, procs=4):
+    def debug(self, procs=4, valgrind=False):
         """
         Call the lb_tools 'debug' routine with proper arguments. See doc there.
         """
         lb_tools.setMPI(self.platform)
-        lb_tools.debug(procs, self.directory, sys.stdout, False)
+        lb_tools.debug(procs, self.directory, sys.stdout,
+                _verbose=False, valgrind=valgrind)
 
     #--------------------------------------------------------------------------
 

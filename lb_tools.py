@@ -3,8 +3,8 @@
 import os
 import sys # for sys.stdout
 import string
-#import h5py
-#import numpy as np
+import h5py
+import numpy as np
 import subprocess # used to run the code
 import shutil # to copy compiled executable with permissions
 import collections # for ordered dictionary, in input file reading/writing
@@ -46,9 +46,13 @@ def compile(platform, flags, configDir, sourceDir, out, clean=True,
 # ============================================================================
 # RUN
 # ============================================================================
-def run_command():
-	#return mpirundir+'mpirun ./'+G_exe+' -f input'
-	return mpirundir+'srun ./'+G_exe+' -f input'
+def run_command(debug=False):
+	if not debug:
+		return mpirundir+'mpirun ./'+G_exe+' -f input'
+	else:
+		valgrindArg = '/apps/prod/HI-ERN/stow/valgrind-3.11.0/bin/valgrind --tool=callgrind'
+		return mpirundir+'mpirun '+valgrindArg+' ./'+G_exe+' -f input'
+	#return mpirundir+'srun ./'+G_exe+' -f input'
 
 def run(_procs, _runDir, _out, _verbose=False):
 	"""
@@ -297,7 +301,7 @@ def setMPI(platform):
 
 	if platform == 'SUN':
 		mpirundir = '/usr/lib/openmpi/1.8.4/common/bin/'
-	elif platform == 'SUN-INTEL':
+	elif platform == 'SUN-INTEL' or platform == 'SUN-INTEL-DEBUG':
 		mpirundir ='/usr/lib/openmpi/1.8.8/common/bin/'
 	else:
 		mpirundir = ''
@@ -309,8 +313,8 @@ def setMPI(platform):
 	if not mpirunExists:
 		if not os.path.isfile(mpirundir+"/mpirun"):
 			print("Error: mpirun not found")
-			return 0
-	return 1
+			return 1
+	return 0
 
 def readHDF5(_file):
 	"""

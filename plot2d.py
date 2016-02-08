@@ -43,7 +43,7 @@ def plotDensity(_field,_vmin=-1,_vmax=-1):
 	if (_vmin == _vmax): # if it was not set outside, or just set stupidly
 		_vmin = np.min(cut)
 		_vmax = np.max(cut)
-	plt.pcolormesh(np.arange(0,lx+1,1), np.arange(0,ly+1,1), cut, vmin=_vmin,vmax=_vmax)
+	plt.pcolormesh(np.arange(0,lx+1,1), np.arange(0,ly+1,1), cut.T, vmin=_vmin,vmax=_vmax)
 	plt.xlim(0,lx)
 	plt.ylim(0,ly)
 
