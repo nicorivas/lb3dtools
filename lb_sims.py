@@ -50,7 +50,7 @@ class Project:
         self.projectFilename = "" # project file, almost only a readme
         self.historyFilename = "" # history file name
         self.sc = 0 # number of simulations
-        self.sims = {} # dictionary of sim-name -> sim-object
+        self.sims = [] # list of simulation objects
         self.loaded = False # if it has been loaded
 
     #--------------------------------------------------------------------------
@@ -131,7 +131,8 @@ class Project:
                 # Found a file, if it's not project or history files, complain
                 filename = os.path.split(dir)[1]
                 if not filename == 'project' and not filename == 'history':
-                    self.warning("Extra file found on project directory ("+dir+")")
+                    if self.DEBUG:
+                        self.warning("Extra file found on project directory ("+dir+")")
         return 0
 
     def writeToFile(self, string):
@@ -176,11 +177,15 @@ class Project:
         elif not os.path.isdir(path):
             self.error("While adding simulation: trying to load a file ("+path+")")
             return 1
+        elif not os.path.isfile(path+'/input'):
+            self.error("Directory '"+path+"' is not a simulation")
+            return 1
         else:
             name_ = os.path.split(path)[1]
-            self.sims[name_] = Simulation()
-            self.sims[name_].load(path)
-            self.sims[name_].setProject(self)
+            self.sims.append(Simulation())
+            self.sims[self.sc].load(path)
+            self.sims[self.sc].setProject(self)
+            self.sims[self.sc].setName(name_)
             self.sc += 1
             return 0
 
@@ -248,6 +253,8 @@ class Simulation:
         self.outputDir = ""
         self.compiled = False
         self.verbose = True
+        self.id = 0 # Id as printed in output files, for restoring sims
+        self.restoreFiles = {}
 
     #--------------------------------------------------------------------------
 
@@ -420,8 +427,11 @@ class Simulation:
         self.inputDicts = lb_tools.inputGetDictionaries(self.inputFile)
 
         # read preprocessor directives
-        f = open(self.template+'/flags','r')
-        self.flags = f.read().strip()
+        if self.flags == "":
+            f = open(self.template+'/flags','r')
+            self.flags = f.read().strip()
+        else:
+            self.warning("Flags were not read from file; already set")
 
         self.message("Template loaded: '"+path+"'")
 
@@ -475,7 +485,7 @@ class Simulation:
 
     #--------------------------------------------------------------------------
 
-    def commit(self,deleteOutput=True):
+    def commit(self,deleteOutput=True,restore=False):
         """
         Commit creates the directories, outputs the input files, and copies
         the executable file if it was compiled
@@ -484,9 +494,18 @@ class Simulation:
             print(self.CLASS_NAME+"::commit()")
 
         if not os.path.exists(self.directory):
-            self.message("Simulation directory doesn't exist! So creating it")
-            os.makedirs(self.directory)
-            self.project.writeToHistory(self.name+' created')
+            if restore:
+                self.error("Set to restore, but simulation does not exist!")
+                exit(0)
+            else:
+                self.message("Simulation directory doesn't exist! So creating it")
+                os.makedirs(self.directory)
+                self.project.writeToHistory(self.name+' created')
+
+        if restore and deleteOutput:
+            self.warning("You really don't want to delete output when"
+                    "restoring! So we changed it")
+            deleteOutput = False
 
         # We use .copy2 because we also want to copy permissions
         # Copy executable
@@ -523,7 +542,8 @@ class Simulation:
                     self.project.writeToHistory("Output dir was removed!",sim=self.name)
                     os.makedirs(fd)
             else:
-                self.warning("Output dir existed, we are adding files there")
+                if not restore:
+                    self.warning("Output dir existed, we are adding files there")
         else:
             os.makedirs(fd)
 
@@ -643,6 +663,42 @@ class Simulation:
                 self.project.writeToHistory("Compiled source with flags "+str(self.flags),sim=self.name)
                 self.compiled = True
         return r
+
+    #--------------------------------------------------------------------------
+
+    def branch(self, target, time='00000010'):
+        if len(self.restoreFiles) == 0:
+            self.error('Restore files not loaded or not existing')
+        for file in self.restoreFiles[time]:
+            shutil.copy2(file, target+'/output')
+
+
+    def loadRestore(self):
+        """
+        Check if there are restore files, and get their ID
+        """
+        files = glob.glob(self.directory+'/output/cp_n_b*.h5')
+        files = sorted(files)
+        if len(files) == 0:
+            self.error('Restore files not found')
+            exit(0)
+
+        # get id
+        file = files[0]
+        self.id = int(file[file.find('_t')+11:file.find('.h5')])
+
+        # get times and set dictionary
+        files = glob.glob(self.directory+'/output/cp_*.h5')
+        for file in files:
+            time = file[file.find('_t')+2:file.find('.h5')-11]
+            if time not in self.restoreFiles.keys():
+                self.restoreFiles[time] = []
+            self.restoreFiles[time].append(file)
+
+        print(self.restoreFiles)
+
+    def restore(self, name):
+        lb_tools.restore(name)
 
     #--------------------------------------------------------------------------
 

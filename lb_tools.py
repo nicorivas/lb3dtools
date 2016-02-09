@@ -76,6 +76,29 @@ def run(_procs, _runDir, _out, _verbose=False):
 		print("done")
 
 # ============================================================================
+# RESTORE
+# ============================================================================
+
+def restore(name):
+	"""
+	Restore from a given snapshot
+	"""
+	global mpirundir, G_exe
+
+	if _verbose:
+		print("Restoring sim at snapshot "+name+":")
+		sys.stdout.flush()
+
+	e = subprocess.call([mpirundir+'mpirun -np '+str(_procs)+' ./'+G_exe+
+		' -f input'], cwd=_runDir, stdout=_out, stderr=_out, shell=True)
+
+	if e != 0:
+		print("failed!")
+		exit(3)
+	else:
+		print("done")
+
+# ============================================================================
 # DEBUG
 # ============================================================================
 
