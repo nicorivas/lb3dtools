@@ -1,0 +1,7 @@
+Set of tools for lb3d simulations
+
+To install just use the usual:
+python setup.py build
+python setup.py install
+
+

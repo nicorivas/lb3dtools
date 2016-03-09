@@ -10,42 +10,24 @@ import matplotlib.patches as patches
 sys.path.append('/data/home/nicorivas/Code/analysis/lb3d/')
 import lb_sims
 
-G_sim = None # Current simulation being worked on
-
 #==============================================================================
-# TODO This shouldn't be here
-def partition(_field, _length):
-	"""Given an array, returns sub arrays of length _length
-	"""
-	return [_field[i:i+_length] for i in range(0, len(_field), _length)]
-
-#==============================================================================
-def setSimulation(_sim):
-	"""Define current simulation used by all plotting functions.
-	"""
-	global G_sim
-	G_sim = _sim
-
-#==============================================================================
-def setFigureSize(_x, _y):
-	#fig = plt.gcf()
-	#fig.set_size_inches(30.0, 30.0)
-	plt.figure(figsize=(_x, _y))
-
-
-#==============================================================================
-def plotDensity(_field,_vmin=-1,_vmax=-1):
-	'''Plots a colour density plot for a 2d field cut
+def plotDensity(field, vmin=-1, vmax=-1, colorbar=0):
 	'''
-	cut = _field
+	Plots a colour density plot for a 2d field.
+	Uses pcolormesh and sets the proper color limits and ranges.
+	'''
+	cut = field
 	ly = len(cut)
 	lx = len(cut[0])
-	if (_vmin == _vmax): # if it was not set outside, or just set stupidly
-		_vmin = np.min(cut)
-		_vmax = np.max(cut)
-	plt.pcolormesh(np.arange(0,lx+1,1), np.arange(0,ly+1,1), cut.T, vmin=_vmin,vmax=_vmax)
-	plt.xlim(0,lx)
-	plt.ylim(0,ly)
+	if (vmin == vmax): # if it was not set outside, or just set stupidly
+		vmin = np.min(cut)
+		vmax = np.max(cut)
+	p = plt.pcolormesh(np.arange(0,ly+1,1), np.arange(0,lx+1,1), cut.T, 
+			vmin=vmin,vmax=vmax)
+	if colorbar:
+		plt.colorbar(p)
+	plt.xlim(0,ly)
+	plt.ylim(0,lx)
 
 #==============================================================================
 def plotProfile(_field, axes=['x','y'],label='',title=''):
@@ -241,85 +223,9 @@ def plotProfilesFromFields():
 	plt.tight_layout(pad=0.5)
 	plt.show()
 
-"""
-def getElecFields(_prefix, _dir, _format, _n=0):
-	'''Gets data from files with 3D matrixes of the different fields.
-	'''
-	if _format == 'hdf5':
-		f_eps = glob.glob(_dir+'/'+_prefix+'eps*')
-		f_phi = glob.glob(_dir+'/'+_prefix+'phi*')
-		f_rhom = glob.glob(_dir+'/'+_prefix+'rho_m*')
-		f_rhop = glob.glob(_dir+'/'+_prefix+'rho_p*')
-	
-		if len(f_eps) == 0:
-			print("File not found")
-			exit(1)
-
-		file_eps = h5py.File(f_eps[_n],'r')
-		eps = np.array(file_eps['OutArray'])
-		file_phi = h5py.File(f_phi[_n],'r')
-		phi = np.array(file_phi['OutArray'])
-		file_rhom = h5py.File(f_rhom[_n],'r')
-		rhom = np.array(file_rhom['OutArray'])
-		file_rhop = h5py.File(f_rhop[_n],'r')
-		rhop = np.array(file_rhop['OutArray'])
-		return [eps, phi, rhom, rhop]
-	elif _format == 'ascii': #ascii output files, see format in a file.
-		#TODO: THIS HAS NEVER BEEN TESTED!
-		f_all = glob.glob(_dir+'/'+_prefix+'*.asc')
-		if len(f_all) == 0:
-			print("No output files found, looking for ascii")
-			exit(1)
-		file = open(f_all[0],'r')
-		
-		rho_p = np.zeros((_nx, _ny, _nz))
-		rho_m = np.zeros((_nx, _ny, _nz))
-		phi = np.zeros((_nx, _ny, _nz))
-		eps = np.zeros((_nx, _ny, _nz))
-		ex = np.zeros((_nx, _ny, _nz))
-		ey = np.zeros((_nx, _ny, _nz))
-		ez = np.zeros((_nx, _ny, _nz))
-		op = np.zeros((_nx, _ny, _nz))
-		rock = np.zeros((_nx, _ny, _nz))
-		for l in file:
-			if l[0] != '#':
-				vals = [float(n) for n in l.split()]
-				rho_p[int(vals[0])][int(vals[1])][int(vals[2])] = vals[3]
-				rho_m[int(vals[0])][int(vals[1])][int(vals[2])] = vals[4]
-				phi[int(vals[0])][int(vals[1])][int(vals[2])] = vals[5]
-				eps[int(vals[0])][int(vals[1])][int(vals[2])] = vals[6]
-				ex[int(vals[0])][int(vals[1])][int(vals[2])] = vals[7]
-				ey[int(vals[0])][int(vals[1])][int(vals[2])] = vals[8]
-				ez[int(vals[0])][int(vals[1])][int(vals[2])] = vals[9]
-				op[int(vals[0])][int(vals[1])][int(vals[2])] = vals[10]
-				rock[int(vals[0])][int(vals[1])][int(vals[2])] = vals[11]
-	elif _format == 'bz2':
-		f_all = glob.glob(_dir+'/'+'*.bz2')
-		
-		if len(f_all) == 0:
-			print('No output files found, looking for .bz2')
-			exit(1)
-		
-		x = []
-		y = []
-		z = []
-		phi = []
-		rhop = []
-		rhom = []
-		
-		x1, y1, z1, phi1, rho_p1, rho_m1 = np.loadtxt(f_all[1], unpack=True, usecols=[0,1,2,7,11,12])
-		
-		x.extend(x1)
-		y.extend(y1)
-		z.extend(z1)
-		phi.extend(phi1)
-		rhop.extend(rho_p1)
-		rhom.extend(rho_m1)
-		
-		phi = np.asarray(partition(partition(phi,30),30))
-		rhom = np.asarray(partition(partition(rhom,30),30))
-		rhop = np.asarray(partition(partition(rhop,30),30))
-
-		return [phi, rhom, rhop]
-
-"""
+#==============================================================================
+# TODO This shouldn't be here
+def partition(_field, _length):
+	"""Given an array, returns sub arrays of length _length
+	"""
+	return [_field[i:i+_length] for i in range(0, len(_field), _length)]

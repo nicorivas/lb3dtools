@@ -113,6 +113,7 @@ class Project:
         return self
 
     #--------------------------------------------------------------------------
+
     def loadSimulations(self):
         """
         Load simulations take the currenct directory and adds all the
@@ -134,6 +135,8 @@ class Project:
                     if self.DEBUG:
                         self.warning("Extra file found on project directory ("+dir+")")
         return 0
+
+    #--------------------------------------------------------------------------
 
     def writeToFile(self, string):
         """
@@ -187,7 +190,24 @@ class Project:
             self.sims[self.sc].setProject(self)
             self.sims[self.sc].setName(name_)
             self.sc += 1
-            return 0
+        return 0
+
+    #--------------------------------------------------------------------------
+
+    def selectSimulations(self, params_col):
+        """
+        Given a list parameters sets, get all simulations that fulfill all
+        conditions. Parameter sets are of the form:
+            [...[dict_number, variable_name, variable_value]...]
+        """
+        sims_all = self.sims
+        sims_col = []
+        for params in params_col:
+            sims = sims_all
+            for param in params:
+                sims = [sim for sim in sims if sim.get(param[0],param[1]) == str(param[2])]
+            sims_col += sims
+        return sims_col
 
     #--------------------------------------------------------------------------
 
@@ -249,6 +269,9 @@ class Simulation:
         # the filenames of the respective field (for every time, and maybe also
         # run and name)
         self.fieldFiles = {}
+            # Dictionary from output field prefix name to list of filenames
+        self.fieldFilesN = {}
+            # Dictionary from output field prefix name to number of files
         self.inputDicts = {}
         self.outputDir = ""
         self.compiled = False
@@ -406,6 +429,7 @@ class Simulation:
             files_.sort()
             if len(files_) > 0:
                 self.fieldFiles[field_name_] = files_
+                self.fieldFilesN[field_name_] = len(files_)
 
     #--------------------------------------------------------------------------
 
@@ -458,7 +482,7 @@ class Simulation:
                 if t < len(self.fieldFiles[fieldname]):
                     fn_ = self.fieldFiles[fieldname][t]
                 else:
-                    self.error("Time is out of bounds "+str(t))
+                    self.error("Time is out of joint (for '{}' at {})".format(fieldname, t))
                     return -1
                 field_ = lb_tools.readHDF5(fn_)
                 if self.DEBUG:
@@ -519,8 +543,9 @@ class Simulation:
         if os.path.isfile(self.inputFile+'.md'):
             lb_tools.inputWrite(self.inputDicts[c_], self.directory+'/input')
             #shutil.copy2(self.inputFile+'.md', self.directory)
-            mdfile = self.template+"/"+self.inputDicts[c]['init_file'][1:-1]
-            shutil.copy2(mdfile, self.directory)
+            if self.template is not '':
+                mdfile = self.template+"/"+self.inputDicts[c_]['init_file'][1:-1]
+                shutil.copy2(mdfile, self.directory)
             c_ += 1
         # Elec config files
         if os.path.isfile(self.inputFile+'.elec'):
@@ -627,7 +652,9 @@ class Simulation:
         f.close()
 
         self.project.writeToHistory("Batch file created",sim=self.name)
+
         self.message("Adding to queue:")
+
         self.project.writeToHistory("Running batch file...",sim=self.name)
 
         # And run it
@@ -636,7 +663,8 @@ class Simulation:
             self.error("Something went wrong when calling sbatch.")
             return return_code_
 
-        self.project.writeToHistory("Batch file finished",sim=self.name)
+        self.project.writeToHistory("Batch file finished!",sim=self.name)
+
         return return_code_
 
     #--------------------------------------------------------------------------
@@ -648,7 +676,8 @@ class Simulation:
         if self.DEBUG:
             self.message_debug(self.CLASS_NAME+"::compile()")
 
-        self.message("Compiling")
+        self.message("Compiling...")
+        print("-"*80)
 
         if out == None:
             out = open(os.devnull,'w')
@@ -660,16 +689,19 @@ class Simulation:
             if r != 0:
                 self.project.writeToHistory("Error: Compilation failed",sim=self.name)
             else:
+                print("-"*80)
                 self.project.writeToHistory("Compiled source with flags "+str(self.flags),sim=self.name)
                 self.compiled = True
         return r
 
     #--------------------------------------------------------------------------
 
-    def branch(self, target, time='00000010'):
+    def branch(self, target, time='0'):
         if len(self.restoreFiles) == 0:
             self.error('Restore files not loaded or not existing')
-        for file in self.restoreFiles[time]:
+        if str(time) not in self.restoreFiles.keys():
+            self.error('Time {} not found in restore files'.format(time))
+        for file in self.restoreFiles[str(time)]:
             shutil.copy2(file, target+'/output')
 
 
@@ -677,7 +709,7 @@ class Simulation:
         """
         Check if there are restore files, and get their ID
         """
-        files = glob.glob(self.directory+'/output/cp_n_b*.h5')
+        files = glob.glob(self.directory+'/output/cp_*.h5')
         files = sorted(files)
         if len(files) == 0:
             self.error('Restore files not found')
@@ -690,12 +722,11 @@ class Simulation:
         # get times and set dictionary
         files = glob.glob(self.directory+'/output/cp_*.h5')
         for file in files:
-            time = file[file.find('_t')+2:file.find('.h5')-11]
+            # str(int(x)) to remove the trailing zeros
+            time = str(int(file[file.find('_t')+2:file.find('.h5')-11]))
             if time not in self.restoreFiles.keys():
                 self.restoreFiles[time] = []
             self.restoreFiles[time].append(file)
-
-        print(self.restoreFiles)
 
     def restore(self, name):
         lb_tools.restore(name)
@@ -722,8 +753,12 @@ class Simulation:
         if out == None:
             out = open(os.devnull,'w')
 
+        self.project.writeToHistory("Run started",sim=self.name)
+
         lb_tools.setMPI(self.platform)
         lb_tools.run(procs, self.directory, out, False)
+
+        self.project.writeToHistory("Run finished!",sim=self.name)
 
     #--------------------------------------------------------------------------
 
