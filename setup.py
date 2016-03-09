@@ -4,4 +4,4 @@ setup(name='lb3dpytools',
       description='Tools for runing, handling and visualizing lb3d simulations',
       author='Nicolas Rivas',
       author_email='nicorivas@gmail.com',
-      py_modules=['sims','tools','plot2d','plot3d'],)
+      packages=['lb3dpytools','lb3dpytools.plot2d','lb3dpytools.plot3d'],)
