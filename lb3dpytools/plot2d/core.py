@@ -11,7 +11,7 @@ import matplotlib.patches as patches
 import lb3dpytools.sims
 
 #==============================================================================
-def _pdensity(field, vmin=-1, vmax=-1, colorbar=0):
+def pdensity(field, vmin=-1, vmax=-1, colorbar=0):
 	'''Plots a colour density plot for a 2d field.
 	Uses pcolormesh and sets the proper color limits and ranges.
 		@field: numpy 2d array of data to plot
@@ -25,13 +25,13 @@ def _pdensity(field, vmin=-1, vmax=-1, colorbar=0):
 	
 	# Determine color range
 	if (vmin == vmax): # if it was not set outside, or just set stupidly
-		vmin = np.min(cut)
-		vmax = np.max(cut)
+		vmin = np.min(field)
+		vmax = np.max(field)
 	
 	p = plt.pcolormesh(
 			np.arange(0,ly+1,1),
 			np.arange(0,lx+1,1),
-			cut.T, 
+			field.T,
 			vmin=vmin,vmax=vmax)
 	
 	if colorbar:
@@ -44,7 +44,7 @@ def _pdensity(field, vmin=-1, vmax=-1, colorbar=0):
 	return p
 
 #==============================================================================
-def _pprofile(field, axes=['x','y'], label='', title=''):
+def pprofile(field, axes=['x','y'], label='', title=''):
 	'''Plots a x-y plot for a 1d field cut
 	'''
 	if len(_field.shape) != 1:
@@ -66,7 +66,7 @@ def _pprofile(field, axes=['x','y'], label='', title=''):
 	return p
 
 #==============================================================================
-def _pprofiles():
+def pprofiles():
 
 	fig = plt.figure()
 	axes = plt.axes()
@@ -90,7 +90,7 @@ def _pprofiles():
 	plt.show()
 
 #==============================================================================
-def _pcolloid():
+def pcolloid():
 	xc = 10.0
 	r = 4.5
 	xi = xc - r/2.0

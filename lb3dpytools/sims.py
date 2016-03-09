@@ -5,12 +5,13 @@
 
 import sys
 import os
-import datetime # to print time stamps in history files
-import shutil # to copy files with permissions
+import datetime   # to print time stamps in history files
+import shutil     # to copy files with permissions
 import subprocess # to execute batch file when queue is called
 import glob
-
-import lb_tools # see module
+import numpy as np
+# Local to module:
+import tools # see module
 
 verbose = False
 
@@ -334,12 +335,12 @@ class Simulation:
 
     def loadInput(self, input='input'):
         """
-        Loads input files, using lb_tools. It is not neccesary to do this for
+        Loads input files, using 'tools'. It is not neccesary to do this for
         all input files (i.e. elec), as it checks if they already exist
         """
         self.inputFile = self.directory+"/"+input
         if os.path.isfile(self.inputFile):
-            self.inputDicts = lb_tools.inputGetDictionaries(self.inputFile)
+            self.inputDicts = tools.inputGetDictionaries(self.inputFile)
             return 0
         else:
             self.error("input file not found")
@@ -448,7 +449,7 @@ class Simulation:
 
         self.template = path
         self.inputFile = path+"/input"
-        self.inputDicts = lb_tools.inputGetDictionaries(self.inputFile)
+        self.inputDicts = tools.inputGetDictionaries(self.inputFile)
 
         # read preprocessor directives
         if self.flags == "":
@@ -484,7 +485,7 @@ class Simulation:
                 else:
                     self.error("Time is out of joint (for '{}' at {})".format(fieldname, t))
                     return -1
-                field_ = lb_tools.readHDF5(fn_)
+                field_ = tools.readHDF5(fn_)
                 if self.DEBUG:
                     self.message_debug(fn_)
             else:
@@ -537,11 +538,11 @@ class Simulation:
             self.copyBinary()
 
         # Update configuration files
-        lb_tools.inputWrite(self.inputDicts[0], self.directory+'/input')
+        tools.inputWrite(self.inputDicts[0], self.directory+'/input')
         c_ = 1
         # Md config files
         if os.path.isfile(self.inputFile+'.md'):
-            lb_tools.inputWrite(self.inputDicts[c_], self.directory+'/input')
+            tools.inputWrite(self.inputDicts[c_], self.directory+'/input')
             #shutil.copy2(self.inputFile+'.md', self.directory)
             if self.template is not '':
                 mdfile = self.template+"/"+self.inputDicts[c_]['init_file'][1:-1]
@@ -549,7 +550,7 @@ class Simulation:
             c_ += 1
         # Elec config files
         if os.path.isfile(self.inputFile+'.elec'):
-            lb_tools.inputWrite(self.inputDicts[c_], self.directory+'/input')
+            tools.inputWrite(self.inputDicts[c_], self.directory+'/input')
             #shutil.copy2(self.inputFile+'.elec', self.directory)
             c_ += 1
         self.project.writeToHistory("Configuration files were written",sim=self.name)
@@ -617,7 +618,7 @@ class Simulation:
         # !! Notice here that we set the directory to the simulation
         os.chdir(self.directory)
 
-        foundmpi = lb_tools.setMPI(self.platform)
+        foundmpi = tools.setMPI(self.platform)
         print(foundmpi)
 
         batch_filename_ = self.project.name+'-'+self.name
@@ -646,7 +647,7 @@ class Simulation:
         if node is not '':
             f.write('#SBATCH --nodelist='+node+'\n')
         if foundmpi==0:
-            f.write(lb_tools.run_command(debug=debug))
+            f.write(tools.run_command(debug=debug))
         else:
             f.write('srun ./lbe -f input')
         f.close()
@@ -671,7 +672,7 @@ class Simulation:
 
     def compile(self, clean=False, debug=False, out=None):
         """
-        Call the lb_tools 'compile' routine with proper arguments. See doc there.
+        Call the 'tools' 'compile' routine with proper arguments. See doc there.
         """
         if self.DEBUG:
             self.message_debug(self.CLASS_NAME+"::compile()")
@@ -684,7 +685,7 @@ class Simulation:
 
         r = 1
         if not self.compiled:
-            r = lb_tools.compile(self.platform, self.flags, CONFIG_DIR, SOURCE_DIR,
+            r = tools.compile(self.platform, self.flags, CONFIG_DIR, SOURCE_DIR,
                 out, clean=clean, debug=debug, verbose=False)
             if r != 0:
                 self.project.writeToHistory("Error: Compilation failed",sim=self.name)
@@ -729,23 +730,23 @@ class Simulation:
             self.restoreFiles[time].append(file)
 
     def restore(self, name):
-        lb_tools.restore(name)
+        tools.restore(name)
 
     #--------------------------------------------------------------------------
 
     def debug(self, procs=4, valgrind=False):
         """
-        Call the lb_tools 'debug' routine with proper arguments. See doc there.
+        Call the 'tools' 'debug' routine with proper arguments. See doc there.
         """
-        lb_tools.setMPI(self.platform)
-        lb_tools.debug(procs, self.directory, sys.stdout,
+        tools.setMPI(self.platform)
+        tools.debug(procs, self.directory, sys.stdout,
                 _verbose=False, valgrind=valgrind)
 
     #--------------------------------------------------------------------------
 
     def run(self, procs=4, out=sys.stdout):
         """
-        Call the lb_tools 'run' routine with proper arguments. See doc there.
+        Call the 'tools' 'run' routine with proper arguments. See doc there.
         """
         if self.DEBUG:
             self.message_debug(self.CLASS_NAME+"::run()")
@@ -755,8 +756,8 @@ class Simulation:
 
         self.project.writeToHistory("Run started",sim=self.name)
 
-        lb_tools.setMPI(self.platform)
-        lb_tools.run(procs, self.directory, out, False)
+        tools.setMPI(self.platform)
+        tools.run(procs, self.directory, out, False)
 
         self.project.writeToHistory("Run finished!",sim=self.name)
 
@@ -764,9 +765,45 @@ class Simulation:
 
     def analyse(self):
         """
-        Call the lb_tools 'analyse' routine with proper arguments. See doc there.
+        Call the 'tools' 'analyse' routine with proper arguments. See doc there.
         """
-        lb_tools.analyse(self.directory, sys.stdout, False)
+        tools.analyse(self.directory, sys.stdout, False)
+
+    #--------------------------------------------------------------------------
+
+    def getMDData(self):
+        """ Read MD snapshot files.
+        Returns an array with the structure a[time][particle] = [x,y,z,...]
+        """
+        if self.outputDir == "":
+            self.error("Output doesn't seem to be loaded")
+            return -1
+
+        filenames = glob.glob(self.outputDir+"/md-cfg_output*")
+        filenames = sorted(filenames)
+
+        #determine the number of particles (we assume it stays constant!)
+        pn = 0
+        f = open(filenames[0],'r')
+        for l in f:
+            pn += 1
+        f.close()
+
+        md_data = np.zeros([len(filenames),pn,7])
+        ti = 0
+        for filename in filenames:
+            pi = 0
+            f = open(filename, 'r')
+            for line in f:
+                ls = line.split()
+                ls = [float(s) for s in ls]
+                md_data[ti][pi] = ls
+                pi += 1
+            ti += 1
+        #print(md_data)
+        #md_data = np.sort(md_data, order='f0', axis=0)
+        #print(md_data)
+        return md_data
 
     #--------------------------------------------------------------------------
 

@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 #sys.path.append('/data/home/nicorivas/Code/analysis/lb3d/')
 import core
-import lb3dtools.sims
+import lb3dpytools.sims
 
 # ============================================================================
 # ============================================================================
@@ -16,9 +16,45 @@ import lb3dtools.sims
 # ============================================================================
 # ============================================================================
 
-# These are level 2 functions: they should use the level 1 functions only,
-# and they are pertinent only for lb3d simulations, that is, they label and
-# make assumptions based on the data from lb3d.
+def mdtrajectory(sim, pn=0):
+	"""Plot the trajectory of a particle in three figures, x-y, x-z and y-z.
+		@sim: Simulation object
+		@pn: Particle number
+	"""
+	sim.loadOutput()
+
+	nx = int(sim.get(0,'nx'))
+	ny = int(sim.get(0,'ny'))
+	nz = int(sim.get(0,'nz'))
+
+	md_data = sim.getMDData()
+	md_datap = md_data[:,pn,:]
+	xs = md_datap[:,0]
+	ys = md_datap[:,1]
+	zs = md_datap[:,2]
+	plt.figure(figsize=(20,10))
+	plt.subplot(1,3,1)
+	plt.gca().set_aspect('equal')
+	plt.plot(xs,ys)
+	plt.xlim(0,nx)
+	plt.ylim(0,ny)
+	plt.xlabel('x')
+	plt.ylabel('y')
+	plt.subplot(1,3,2)
+	plt.gca().set_aspect('equal')
+	plt.plot(xs,zs)
+	plt.xlim(0,nx)
+	plt.ylim(0,nz)
+	plt.xlabel('x')
+	plt.ylabel('z')
+	plt.subplot(1,3,3)
+	plt.gca().set_aspect('equal')
+	plt.plot(ys,zs)
+	plt.xlim(0,ny)
+	plt.ylim(0,nz)
+	plt.xlabel('y')
+	plt.ylabel('z')
+
 
 def plot_velprofile(sim, time=0, fieldprefix='', dir=0, verbose=0, show=0):
 	"""
@@ -114,49 +150,15 @@ def plot_velprofile(sim, time=0, fieldprefix='', dir=0, verbose=0, show=0):
 	#plt.plot(vp)
 
 
-def plot_veldensity(sim, time=0, fieldprefix='', dir=0, verbose=0):
-	"""
-	Density plots of the norm of the velocity
+def veldensity(sim, time=0, fieldprefix='', dir=0, verbose=0):
+	"""CT scan of the norm of the velocity, in direction 'dir'
 	"""
 	sim.loadOutput()
-	vx = sim.getField(fieldprefix+'velx', t=time)
-	vy = sim.getField(fieldprefix+'vely', t=time)
-	vz = sim.getField(fieldprefix+'velz', t=time)
-
-	if isinstance(vx, int) or isinstance(vy, int) or isinstance(vz, int):
-		error('Field not found')
-		exit(0)
-
-	vxmin = np.min(vx)
-	vxmax = np.max(vx)
-	vymin = np.min(vy)
-	vymax = np.max(vy)
-	vzmin = np.min(vz)
-	vzmax = np.max(vz)
-
-	if verbose:
-		print 'min(vx)={} max(vx)={}'.format(vxmin,vxmax)
-		print 'min(vy)={} max(vy)={}'.format(vymin,vymax)
-		print 'min(vz)={} max(vz)={}'.format(vzmin,vzmax)
-
-	zeros = [False, False, False]
-	if vxmin == 0.0 and vxmax == 0.0:
-		zeros[0] = True
-	if vymin == 0.0 and vymax == 0.0:
-		zeros[1] = True
-	if vzmin == 0.0 and vzmax == 0.0:
-		zeros[2] = True
-
-	if zeros[0] and zeros[1] and zeros[2]:
-		print('The field is zero, refusing to plot')
-		return 1
-
-
-	#if dir==0:
+	vx = getField(sim, fieldprefix+'velx', time=time, verbose=verbose)
+	vy = getField(sim, fieldprefix+'vely', time=time, verbose=verbose)
+	vz = getField(sim, fieldprefix+'velz', time=time, verbose=verbose)
 	vs = vx*vx+vy*vy+vz*vz
-	print(np.max(vs))
-	print(vs)
-	ct_scan(sim, vs, dir=0)
+	ct_scan(sim, vs, dir=dir)
 
 def plot_velfield(sim, time=0, fieldprefix='', dir=0, cut=0, show=0, verbose=0):
 	"""
@@ -267,35 +269,50 @@ def plot_velfield(sim, time=0, fieldprefix='', dir=0, cut=0, show=0, verbose=0):
 
 
 # Plot potential ==============================================================
-def plot_potential(sim, dir=0, time=0, fieldname='elec-', show=0, cut=0, verbose=1):
+def pelecpotential(sim, dir=0, time=0, fieldname='elec-', show=0, cut=0,
+		vmin=0.0, vmax=0.0, vminp=1.0, vmaxp=1.0, verbose=1):
+	"""Plot CT scan of the electric potential in specified direction
+		@dir: direction of the CT scan
+		@time: time index of file to get
+	"""
 	sim.loadOutput()
 
-	phi = sim.getField(fieldname+'phi',t=time)
+	phi = getField(sim, fieldname+'phi', time=time, verbose=verbose)
 
-	phimin = np.min(phi)
-	phimax = np.max(phi)
-
-	if verbose:
-		print 'min(phi)={} max(phi)={}'.format(phimin,phimax)
-	if phimin == 0.0 and phimax == 0.0:
-		print('The field appears to be zero, refusing to plot')
-		return 1
-	if phimin == phimax:
-		print('Field appears to be homogeneous')
-	
-	print(phimin)
-	print(phimax)
-	
-	#ct_scan(sim, phi, dir=0, title='phi')
-	cut = 8
+	ct_scan(sim, phi, dir=dir, title='phi', vmin=vmin, vmax=vmax, vminp=vminp, vmaxp=vmaxp)
+	#cut = 8
 	#print(phi)
-	rho_m = phi[:,8,:]
-	print(rho_m)
-	plot2d.plotDensity(rho_m,colorbar=1, vmin=.0006, vmax=0.0)
+	#rho_m = phi[:,8,:]
+	#print(rho_m)
+	#core.pdensity(rho_m,colorbar=1, vmin=.0006, vmax=0.0)
+	#plt.tight_layout()
+
+	if show:
+		plt.show()
+
+def pelecpotential_density(sim, dir=0, time=0, fieldname='elec-', show=0, cut=0,
+		vmin=0.0, vmax=0.0, vminp=1.0, vmaxp=1.0, verbose=1):
+	"""Plot CT scan of the electric potential in specified direction
+		@dir: direction of the CT scan
+		@time: time index of file to get
+	"""
+	sim.loadOutput()
+
+	phi = getField(sim, fieldname+'phi', time=time, verbose=verbose)
+
+	if dir==0:
+		rho_m = phi[cut,:,:]
+	elif dir==1:
+		rho_m = phi[:,cut,:]
+	elif dir==2:
+		rho_m = phi[:,:,cut]
+
+	core.pdensity(rho_m,colorbar=1, vmin=vmin, vmax=vmax)
 	plt.tight_layout()
 
 	if show:
 		plt.show()
+
 
 # Plot dielectric field =======================================================
 def plot_dielectric(sim, dir=0, time=0, fieldname='elec-', show=0, cut=0):
@@ -317,63 +334,43 @@ def plot_dielectric(sim, dir=0, time=0, fieldname='elec-', show=0, cut=0):
 	plt.show()
 
 # Plot charge field ===========================================================
-def plot_charge_profile(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
+def peleccharge_profile(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
 		cut=[0,0], show=0):
-	"""
-	Given a simulation object, print the charge field (both rho_m and rho_p),
+	"""Given a simulation object, print the charge field (both rho_m and rho_p),
 	as a profile in a given direction, for given cuts.
 	"""
 	sim.loadOutput()
 
+	nx = int(sim.get(0,'nx'))
+	ny = int(sim.get(0,'ny'))
+	nz = int(sim.get(0,'nz'))
+
 	fieldname = fieldprefix+'rho_m'
-	rho_m = sim.getField(fieldname,t=time)
-	if isinstance(rho_m, int):
-		error("Field not found '{}' at time '{}'".format(fieldname, time))
-		exit(0)
-
+	rho_m = getField(sim, fieldname, time=time, verbose=verbose)
 	fieldname = fieldprefix+'rho_p'
-	rho_p = sim.getField(fieldname,t=time)
-	if isinstance(rho_p, int):
-		error("Field not found '{}' at time '{}'".format(fieldname, time))
-		exit(0)
-
-	rhommin = np.min(rho_m)
-	rhommax = np.max(rho_m)
-	rhopmin = np.min(rho_p)
-	rhopmax = np.max(rho_p)
-
-	if verbose:
-		print 'min(rho_m)={} max(rho_m)={}'.format(rhommin,rhommax)
-		print 'min(rho_p)={} max(rho_p)={}'.format(rhopmin,rhopmax)
-
-	zeros = [False, False]
-	if rhommin == 0.0 and rhommax == 0.0:
-		zeros[0] = True
-	if rhopmin == 0.0 and rhopmax == 0.0:
-		zeros[1] = True
-	if zeros[0] and zeros[1]:
-		message('The field appears to be zero (rhopmin = {}, rhopmax = {}),'
-		' refusing to plot'.format(rhopmin,rhopmax))
-		return 1
+	rho_p = getField(sim, fieldname, time=time, verbose=verbose)
 
 	if dir==0:
 		rho_m = rho_m[:,cut[0],cut[1]]
 		rho_p = rho_p[:,cut[0],cut[1]]
-		xl = 'x'
+		xl = nx
+		xn = 'x'
 	elif dir==1:
 		rho_m = rho_m[cut[0],:,cut[1]]
 		rho_p = rho_p[cut[0],:,cut[1]]
-		xl = 'y'
+		xl = ny
+		xn = 'y'
 	elif dir==2:
 		rho_m = rho_m[cut[0],cut[1],:]
 		rho_p = rho_p[cut[0],cut[1],:]
-		xl = 'z'
+		xl = nz
+		xn = 'z'
 
 	plt.plot(rho_m)
-	plt.xlim([0,16])
-	plt.ylim([0.039,0.04])
+	plt.plot(rho_p)
+	plt.xlim([0,xl])
 	#plt.plot(rho_p)
-	#plt.xlabel(xl)
+	plt.xlabel(xn)
 	#plt.ylabel('rho')
 	#plt.title('rho_m, rho_p')
 	#plt.tight_layout()
@@ -382,8 +379,8 @@ def plot_charge_profile(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
 		plt.show()
 
 # Plot charge profiles ========================================================
-def plot_charge(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
-		cut=0, show=0):
+def peleccharge(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
+		cut=0, show=0, vmax=0.0, vmin=0.0, vmaxp=1.0, vminp=1.0):
 	"""
 	Given a simulation object, print the charge field (both rho_m and rho_p),
 	as individual large density fields at position 'cut', and ct_scans, all
@@ -391,60 +388,34 @@ def plot_charge(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
 	"""
 	sim.loadOutput()
 
+
 	fieldname = fieldprefix+'rho_m'
-	rho_m = sim.getField(fieldname,t=time)
-	if isinstance(rho_m, int):
-		error("Field not found '{}' at time '{}'".format(fieldname, time))
-		exit(0)
-
-	fieldname = fieldprefix+'rho_p'
-	rho_p = sim.getField(fieldname,t=time)
-	if isinstance(rho_p, int):
-		error("Field not found '{}' at time '{}'".format(fieldname, time))
-		exit(0)
-
-	rhommin = np.min(rho_m)
-	rhommax = np.max(rho_m)
-	rhopmin = np.min(rho_p)
-	rhopmax = np.max(rho_p)
-
-	if verbose:
-		print 'min(rho_m)={} max(rho_m)={}'.format(rhommin,rhommax)
-		print 'min(rho_p)={} max(rho_p)={}'.format(rhopmin,rhopmax)
-
-	zeros = [False, False]
-	if rhommin == 0.0 and rhommax == 0.0:
-		zeros[0] = True
-	if rhopmin == 0.0 and rhopmax == 0.0:
-		zeros[1] = True
-	if zeros[0] and zeros[1]:
-		message('The field appears to be zero (rhopmin = {}, rhopmax = {}),'
-		' refusing to plot'.format(rhopmin,rhopmax))
-		return 1
-
-	#ct_scan(sim, rho_m, dir=dir, title='rho_m')
-	#ct_scan(sim, rho_p, dir=dir, title='rho_p')
+	rho_m = getField(sim, fieldname, time=time, verbose=verbose)
+	rho_p = getField(sim, fieldname, time=time, verbose=verbose)
 
 	if dir==0:
-		rho_m = rho_m[cut,:,:]
-		rho_p = rho_p[cut,:,:]
+		rho_m_c = rho_m[cut,:,:]
+		rho_p_c = rho_p[cut,:,:]
 		xl = 'y'
 		yl = 'z'
 	elif dir==1:
-		rho_m = rho_m[:,cut,:]
-		rho_p = rho_p[:,cut,:]
+		rho_m_c = rho_m[:,cut,:]
+		rho_p_c = rho_p[:,cut,:]
 		xl = 'x'
 		yl = 'z'
 	elif dir==2:
-		rho_m = rho_m[:,:,cut]
-		rho_p = rho_p[:,:,cut]
+		rho_m_c = rho_m[:,:,cut]
+		rho_p_c = rho_p[:,:,cut]
 		xl = 'x'
 		yl = 'y'
+
+	ct_scan(sim, rho_p, dir=dir)
+	ct_scan(sim, rho_m, dir=dir)
 
 	#plt.figure(figsize=[12,6])
 	#plt.subplot(1,2,1)
 	#plot2d.plotDensity(rho_m, colorbar=1)#
-	plot2d.plotDensity(rho_p, colorbar=1)#, vmin=0.03, vmax=0.2)
+	#core.pdensity(rho_p, colorbar=1)#, vmin=0.03, vmax=0.2)
 	#plt.xlabel(xl)
 	#plt.ylabel(yl)
 	#plt.title('rho_m')
@@ -461,46 +432,37 @@ def plot_charge(sim, time=0, fieldprefix='elec-', dir=0, verbose=0,
 		plt.show()
 
 # Plot density fields =========================================================
-def plot_density(sim, time=0, fieldname='elec-', show=1, verbose=0):
+def density(sim, time=0, dir=0, fieldname='', show=1, verbose=0):
 	sim.loadOutput()
-	od = sim.getField('od',t=time)
-	wd = sim.getField('wd',t=time)
+	od = getField(sim, 'od',time=time, verbose=verbose)
+	wd = getField(sim, 'od',time=time, verbose=verbose)
 
-	odmin = np.min(od)
-	odmax = np.max(od)
-	wdmin = np.min(wd)
-	wdmax = np.max(wd)
+	ct_scan(sim, od, dir=dir)
+	ct_scan(sim, wd, dir=dir)
 
-	if verbose:
-		print 'min(od)={} max(od)={}'.format(odmin,odmax)
-		print 'min(wd)={} max(wd)={}'.format(wdmin,wdmax)
+	if show:
+		plt.show()
 
-	zeros = [False, False]
-	if odmin == 0.0 and odmax == 0.0:
-		zeros[0] = True
-	if wdmin == 0.0 and wdmax == 0.0:
-		zeros[1] = True
-	if zeros[0] and zeros[1]:
-		print('The field appears to be zero, refusing to plot')
-		return 1
+def density_density(sim, time=0, dir=0, cut=0, fieldname='', show=1, verbose=0,
+		vmin=0.0, vmax=0.0):
+	sim.loadOutput()
+	od = getField(sim, 'od',time=time, verbose=verbose)
+	wd = getField(sim, 'od',time=time, verbose=verbose)
 
-	ct_scan(sim, od, dir=0)
-	ct_scan(sim, wd, dir=0)
+	if dir==0:
+		od_c = od[cut,:,:]
+		wd_c = wd[cut,:,:]
+	elif dir==1:
+		od_c = od[:,cut,:]
+		wd_c = wd[:,cut,:]
+	elif dir==2:
+		od_c = od[:,:,cut]
+		wd_c = wd[:,:,cut]
 
-	z = 0
-	od = od[z,:,:]
-	wd = wd[z,:,:]
-
-	plt.figure(figsize=[12,6])
-	plt.subplot(1,2,1)
-	plot2d.plotDensity(od)
-	plt.title('od (time={} z={})'.format(time, z))
+	core.pdensity(od_c,colorbar=1, vmin=vmin, vmax=vmax)
 	plt.tight_layout()
 
-	plt.subplot(1,2,2)
-	plot2d.plotDensity(wd)
-	plt.title('wd (time={} z={})'.format(time, z))
-	plt.tight_layout()
+
 	if show:
 		plt.show()
 
@@ -602,6 +564,29 @@ def plot_localcomposition(sim,time=0):
 # ============================================================================
 # ============================================================================
 
+def getField(sim, fieldname, time=0, verbose=0):
+	""" Get a field from a simulation, with additional checks for zero or
+	homogeneity
+	"""
+	sim.loadOutput()
+
+	field = sim.getField(fieldname, t=time)
+
+	if isinstance(field, int):
+		error('Field not found')
+		exit(0)
+
+	fmin = np.min(field)
+	fmax = np.max(field)
+	if verbose:
+		print('min({})={} max({})={}'.format(fieldname,fmin,fieldname,fmax))
+	if fmin == 0.0 and fmax == 0.0:
+		warning('The field \''+fieldname+'\' is zero!')
+	elif fmin == fmax:
+		warning('The field \''+fieldname+'\' is homogeneous!')
+
+	return field
+
 # These are level 1 functions: they should use the level 0 (matplotlib)
 # functions only, and should work with simulation objects 
 
@@ -614,7 +599,7 @@ def profile(sim, field, dir=0, cuts=[0,0]):
 		cut = field[cuts[0],cuts[1],:]
 	min = np.min(cut)
 	max = np.max(cut)
-	plot2d.plotProfile(cut)
+	core.pprofile(cut)
 
 def profiles(sim, field, dir=0):
 
@@ -633,7 +618,6 @@ def profiles(sim, field, dir=0):
 	min = np.min(field) # for range
 
 	c = 1
-	plot2d.setFigureSize(14.0, 14.0)
 	for rx in range(0, lvls):
 		if dir == 0:
 			x = np.round(rx*dy)
@@ -652,13 +636,13 @@ def profiles(sim, field, dir=0):
 			else:
 				y = np.round(ry*dy)
 			if dir == 0:
-				plot2d.plotProfile(field[:,x,y],axes=['x','phi'],title='y='+str(x),
+				core.pprofile(field[:,x,y],axes=['x','phi'],title='y='+str(x),
 						label='z='+str(y))
 			elif dir == 1:
-				plot2d.plotProfile(field[x,:,y],axes=['y','phi'],title='x='+str(x),
+				core.pprofile(field[x,:,y],axes=['y','phi'],title='x='+str(x),
 						label='z='+str(y))
 			elif dir == 2:
-				plot2d.plotProfile(field[x,y,:],axes=['z','phi'],title='x='+str(x),
+				core.pprofile(field[x,y,:],axes=['z','phi'],title='x='+str(x),
 						label='y='+str(y))
 		c += 1
 		#legend = plt.legend(loc='upper right')
@@ -667,19 +651,17 @@ def profiles(sim, field, dir=0):
 
 #------------------------------------------------------------------------------
 
-def ct_scan(sim, field, dir=0, vmin=0, vmax=0, title='', cuts=[]):
+def ct_scan(sim, field, dir=0, vmin=0, vmax=0, vminp=1.0, vmaxp=1.0, title='', cuts=[]):
+	""" Series of density plots of cuts (slices) of a 3D field in the direction
+	specified by dir.
 	"""
-	Series of density plots for cuts in a 3D field in the direction specified by
-	dir
-	"""
+	sim.loadOutput()
 
 	if dir < 0 or dir > 2:
-		error('dir out of bounds')
+		error('\'dir={}\' out of bounds'.format(dir))
 		exit(0)
 
 	dir_length_names = ['nx','ny','nz']
-
-	plt.figure(figsize=[12.0, 12.0])
 
 	if len(cuts) == 0:
 		nl = int(sim.get(0, dir_length_names[dir]))
@@ -691,18 +673,22 @@ def ct_scan(sim, field, dir=0, vmin=0, vmax=0, title='', cuts=[]):
 	w = np.ceil(np.sqrt(nl))
 	h = np.ceil(np.sqrt(nl))
 
+	vmin = np.min(field)*vminp
+	vmax = np.max(field)*vmaxp
+
+	plt.figure(figsize=[12.0, 12.0])
 	for c, n in enumerate(values):
 		plt.subplot(w,h,c+1)
 		if dir == 0:
-			plot2d.plotDensity(field[n,:,:],vmin,vmax)
+			core.pdensity(field[n,:,:],vmin,vmax)
 			plt.xlabel('y')
 			plt.ylabel('z')
 		elif dir == 1:
-			plot2d.plotDensity(field[:,n,:],vmin,vmax)
+			core.pdensity(field[:,n,:],vmin,vmax)
 			plt.xlabel('x')
 			plt.ylabel('z')
 		elif dir == 2:
-			plot2d.plotDensity(field[:,:,n],vmin,vmax)
+			core.pdensity(field[:,:,n],vmin,vmax)
 			plt.xlabel('x')
 			plt.ylabel('y')
 		if title is not '':
@@ -711,11 +697,33 @@ def ct_scan(sim, field, dir=0, vmin=0, vmax=0, title='', cuts=[]):
 
 #------------------------------------------------------------------------------
 
-def error(string):
-	print('(plotter.py) Error! '+string)
+class bcolors:
+	WARNING = '\033[91m'
+	ERROR = '\033[93m'
+	ENDL = '\033[0m'
 
-def message(string):
-	print('(plotter.py) '+string)
+def error(msg):
+	print('(plot2d): ' + bcolors.ERROR + 'Error: ' + msg + bcolors.ENDL)
+
+def message(msg):
+	print('(plot2d): ' + msg)
+
+def warning(msg):
+	print('(plot2d): ' + bcolors.WARNING + 'Warning: ' + msg + bcolors.ENDL)
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 
 def main():
 
