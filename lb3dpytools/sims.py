@@ -28,12 +28,12 @@ CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
 #CONFIG_DIR = "/Users/local_admin/Code/lb3d"
 
 class Project:
-    """
+    """Class to hold collections of simulation, defined by a directory.
     The class project is useful to manage directories with many simualtions,
     which are here refered to as projects. It manages a history file for
     every simulation that is run, modified, deleted, or others. It also has
     an array with all simulations in the directory, which can be useful
-    when analysing data
+    when analysing data.
     """
 
     CLASS_NAME = 'Project'
@@ -53,6 +53,7 @@ class Project:
         self.sc = 0 # number of simulations
         self.sims = [] # list of simulation objects
         self.loaded = False # if it has been loaded
+        self.say = tools.Say(self)
 
     #--------------------------------------------------------------------------
 
@@ -69,8 +70,14 @@ class Project:
         self.projectFilename = self.directory+'/project'
         self.historyFilename = self.directory+'/history'
 
-        # CREATE DIRECTORY AND FILES
-        os.makedirs(self.directory)
+        # Create directory
+        try:
+            os.makedirs(self.directory)
+        except OSError as e:
+            self.say.error('Could create directory when creating project: {}'.format(e))
+            exit(0)
+
+        # Log and project files
         self.writeToFile("Project file\n")
         self.writeToHistory("Project created\n")
 
@@ -79,44 +86,40 @@ class Project:
     #--------------------------------------------------------------------------
 
     def load(self, name):
-        """
+        """Loads a project by name.
         Given a name, we know the directory to look for, and we add all
         simulations to the sims array as Simulation objects.
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::load(name="+name+")")
+            self.say.message_debug(self.CLASS_NAME+"::load(name="+name+")")
 
         self.name = name
         self.directory = DATA_DIR+"/"+name
         if not os.path.exists(self.directory):
-            self.error("Project does not exist ("+self.directory+")!")
+            self.say.error("Project does not exist ("+self.directory+")!")
             return 1
         self.projectFilename = self.directory+'/project'
         if not os.path.isfile(self.projectFilename):
-            self.error("Project file not found."
+            self.say.error("Project file not found."
                     " Are you sure is this a project directory? Aborting")
             return 1
         self.historyFilename = self.directory+'/history'
         if not os.path.isfile(self.historyFilename):
-            self.error("History file not found."
+            self.say.error("History file not found."
                     " Are you sure is this a project directory? Aborting")
             return 1
 
         if verbose:
-            self.message("Loaded ('"+self.directory+"')")
+            self.say.message("Loaded ('"+self.directory+"')")
 
         self.loaded = True
-
-        # Look for simulations
-
-        #self.loadSimulations()
 
         return self
 
     #--------------------------------------------------------------------------
 
     def loadSimulations(self):
-        """
+        """Loads all simulations in the project's directory.
         Load simulations take the currenct directory and adds all the
         directories that are found to be a simulation. We complain for
         non-project files in the directory. TODO: Should we?
@@ -134,41 +137,13 @@ class Project:
                 filename = os.path.split(dir)[1]
                 if not filename == 'project' and not filename == 'history':
                     if self.DEBUG:
-                        self.warning("Extra file found on project directory ("+dir+")")
+                        self.say.warning("Extra file found on project directory ("+dir+")")
         return 0
 
     #--------------------------------------------------------------------------
 
-    def writeToFile(self, string):
-        """
-        Write the given string to the project file. Quite useless now but
-        eventually useful
-        """
-        file = open(self.projectFilename,'w')
-        file.write(string)
-        file.close()
-
-    #--------------------------------------------------------------------------
-
-    def writeToHistory(self, string, sim=""):
-        """
-        Write string to the project's history file, with an added timestamp
-        Optional 'sim' argument can be given to identify which simulation
-        is writing here.
-        """
-        if (os.path.exists(self.historyFilename)):
-            file = open(self.historyFilename,'a')
-        else:
-            file = open(self.historyFilename,'w')
-        time = datetime.datetime.now()
-        file.write(str(time)+': ('+sim+') '+string+'\n')
-        file.close()
-
-    #--------------------------------------------------------------------------
-
     def addSimulation(self, path):
-        """
-        Add a simulation to the project, that is, to the array 'sims'.
+        """Add a simulation to the project, that is, to the array 'sims'.
         Make sure it exists first.
         Notice that simulations are also loaded (.load is called in Simulation)
         """
@@ -212,25 +187,29 @@ class Project:
 
     #--------------------------------------------------------------------------
 
-    def message(self, str):
-        print('p_('+self.name+'): '+str)
+    def writeToFile(self, string):
+        """Write the given string to the project file.
+        Quite useless now but eventually useful.
+        """
+        file = open(self.projectFilename,'w')
+        file.write(string)
+        file.close()
 
     #--------------------------------------------------------------------------
 
-    def message_debug(self, str):
-        print('p_('+self.name+'): '+str)
-
-    #--------------------------------------------------------------------------
-
-    def error(self, str):
-        print('p_('+self.name+'): !ERROR! '+str)
-
-    #--------------------------------------------------------------------------
-
-    def warning(self, str):
-        print('p_('+self.name+'): Warning! '+str)
-
-    #--------------------------------------------------------------------------
+    def writeToHistory(self, string, sim=""):
+        """
+        Write string to the project's history file, with an added timestamp
+        Optional 'sim' argument can be given to identify which simulation
+        is writing here.
+        """
+        if (os.path.exists(self.historyFilename)):
+            file = open(self.historyFilename,'a')
+        else:
+            file = open(self.historyFilename,'w')
+        time = datetime.datetime.now()
+        file.write(str(time)+': ('+sim+') '+string+'\n')
+        file.close()
 
     def __str__(self):
         return  "Project instance:\n"\
@@ -273,12 +252,14 @@ class Simulation:
             # Dictionary from output field prefix name to list of filenames
         self.fieldFilesN = {}
             # Dictionary from output field prefix name to number of files
+        self.outputLoaded = False
         self.inputDicts = {}
         self.outputDir = ""
         self.compiled = False
         self.verbose = True
         self.id = 0 # Id as printed in output files, for restoring sims
         self.restoreFiles = {}
+        self.say = tools.Say(self)
 
     #--------------------------------------------------------------------------
 
@@ -294,17 +275,21 @@ class Simulation:
     #--------------------------------------------------------------------------
 
     def setProject(self, project):
+        """ In case we loaded the single simulation, assign the project
+        """
         self.project = project
 
     #--------------------------------------------------------------------------
 
     def setName(self, name):
+        """ Setter that also sets the directory name (which is always the same)
+        """
         self.name = name
 
         if self.project is not None:
             self.directory = self.project.directory+"/"+self.name
         else:
-            self.error("Setting name, but project is not set!")
+            self.say.error("Setting name, but project is not set!")
             return 1
 
         return 0
@@ -320,7 +305,7 @@ class Simulation:
             self.message_debug(self.CLASS_NAME+"::load(path="+path+")")
 
         if not os.path.isdir(path):
-            self.error("While loading: directory does not exist! ("+path+")")
+            self.say.error("While loading: directory does not exist! ("+path+")")
             return 1
         else:
             self.directory = path
@@ -343,7 +328,7 @@ class Simulation:
             self.inputDicts = tools.inputGetDictionaries(self.inputFile)
             return 0
         else:
-            self.error("input file not found")
+            self.say.error("input file not found")
             return 1
 
     #--------------------------------------------------------------------------
@@ -353,16 +338,21 @@ class Simulation:
         Load into the simulation class output data.
         First check if  output directory exists.
         """
-        if 'folder' in self.inputDicts[0].keys():
-            self.outputDir = self.inputDicts[0]['folder'][1:-1]
-        else:
-            self.outputDir = 'Production'
+        if not self.outputLoaded:
+            if 'folder' in self.inputDicts[0].keys():
+                self.outputDir = self.inputDicts[0]['folder'][1:-1]
+            else:
+                self.outputDir = 'Production'
 
-        if (os.path.exists(self.directory+'/'+self.outputDir)):
-            self.loadFieldFiles(prefix)
-            return 0
+            if (os.path.exists(self.directory+'/'+self.outputDir)):
+                self.loadFieldFiles(prefix)
+                self.outputLoaded = True
+                return 0
+            else:
+                return 1
         else:
-            return 1
+            if self.verbose:
+                self.say.warning('Tried to load output when already loaded')
 
     #--------------------------------------------------------------------------
 
@@ -373,7 +363,7 @@ class Simulation:
             @prefix: for selecting by wildcards
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::loadFieldFiles()")
+            self.say.message_debug(self.CLASS_NAME+"::loadFieldFiles()")
 
         # Not neccesarely present, just all possible output prefixes from lb3d
         field_names_ = ['flooil','arr',
@@ -441,10 +431,10 @@ class Simulation:
         input file every time we want to run a simulation.
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::loadTemplate()")
+            self.say.message_debug(self.CLASS_NAME+"::loadTemplate()")
 
         if not os.path.exists(path):
-            self.error("Template not found! ("+path+")")
+            self.say.error("Template not found! ("+path+")")
             exit(1)
 
         self.template = path
@@ -474,7 +464,7 @@ class Simulation:
             self.message_debug(self.CLASS_NAME+"::getField(fieldname="+fieldname+")")
 
         if self.fieldFiles.keys() == []:
-            self.error("Looks like you haven't loaded the output, use loadOutput")
+            self.say.error("Looks like you haven't loaded the output, use loadOutput")
             return -1
 
         field_ = []
@@ -483,16 +473,16 @@ class Simulation:
                 if t < len(self.fieldFiles[fieldname]):
                     fn_ = self.fieldFiles[fieldname][t]
                 else:
-                    self.error("Time is out of joint (for '{}' at {})".format(fieldname, t))
+                    self.say.error("Time is out of joint (for '{}' at {})".format(fieldname, t))
                     return -1
                 field_ = tools.readHDF5(fn_)
                 if self.DEBUG:
-                    self.message_debug(fn_)
+                    self.say.message_debug(fn_)
             else:
-                self.warning("Field not found '"+fieldname+"'")
+                self.say.warning("Field not found '"+fieldname+"'")
                 return -1
         else:
-            self.error("Format not supported")
+            self.say.error("Format not supported")
             return -1
         return field_
 
@@ -520,15 +510,15 @@ class Simulation:
 
         if not os.path.exists(self.directory):
             if restore:
-                self.error("Set to restore, but simulation does not exist!")
+                self.say.error("Set to restore, but simulation does not exist!")
                 exit(0)
             else:
-                self.message("Simulation directory doesn't exist! So creating it")
+                self.say.message("Simulation directory doesn't exist! So creating it")
                 os.makedirs(self.directory)
                 self.project.writeToHistory(self.name+' created')
 
         if restore and deleteOutput:
-            self.warning("You really don't want to delete output when"
+            self.say.warning("You really don't want to delete output when"
                     "restoring! So we changed it")
             deleteOutput = False
 
@@ -569,7 +559,7 @@ class Simulation:
                     os.makedirs(fd)
             else:
                 if not restore:
-                    self.warning("Output dir existed, we are adding files there")
+                    self.say.warning("Output dir existed, we are adding files there")
         else:
             os.makedirs(fd)
 
@@ -588,7 +578,7 @@ class Simulation:
         if key in self.inputDicts[dicn].keys():
             return self.inputDicts[dicn][key]
         else:
-            self.error("Property key '"+key+"' not found")
+            self.say.error("Property key '"+key+"' not found")
             return -1
 
     #--------------------------------------------------------------------------
@@ -610,7 +600,7 @@ class Simulation:
 
         """
         if self.DEBUG:
-            print(self.CLASS_NAME+"::queue()")
+            self.say.message_debug(self.CLASS_NAME+"::queue()")
 
         return_code_ = 0        # return from calling program
         batch_filename_ = ""    # name of the bash script file to be run
@@ -619,7 +609,6 @@ class Simulation:
         os.chdir(self.directory)
 
         foundmpi = tools.setMPI(self.platform)
-        print(foundmpi)
 
         batch_filename_ = self.project.name+'-'+self.name
 
@@ -661,7 +650,7 @@ class Simulation:
         # And run it
         return_code_ = subprocess.call("sbatch "+batch_filename_, shell=True)
         if return_code_ != 0:
-            self.error("Something went wrong when calling sbatch.")
+            self.say.error("Something went wrong when calling sbatch.")
             return return_code_
 
         self.project.writeToHistory("Batch file finished!",sim=self.name)
@@ -675,7 +664,7 @@ class Simulation:
         Call the 'tools' 'compile' routine with proper arguments. See doc there.
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::compile()")
+            self.say.message_debug(self.CLASS_NAME+"::compile()")
 
         self.message("Compiling...")
         print("-"*80)
@@ -698,13 +687,16 @@ class Simulation:
     #--------------------------------------------------------------------------
 
     def branch(self, target, time='0'):
+        """ Branch takes simulation 'target' and copies the checkpoint files to current simulation
+        """
         if len(self.restoreFiles) == 0:
-            self.error('Restore files not loaded or not existing')
+            self.say.error('Restore files not loaded or not existing')
         if str(time) not in self.restoreFiles.keys():
-            self.error('Time {} not found in restore files'.format(time))
+            self.say.error('Time {} not found in restore files'.format(time))
         for file in self.restoreFiles[str(time)]:
             shutil.copy2(file, target+'/output')
 
+    #--------------------------------------------------------------------------
 
     def loadRestore(self):
         """
@@ -713,7 +705,7 @@ class Simulation:
         files = glob.glob(self.directory+'/output/cp_*.h5')
         files = sorted(files)
         if len(files) == 0:
-            self.error('Restore files not found')
+            self.say.error('Restore files not found')
             exit(0)
 
         # get id
@@ -729,14 +721,17 @@ class Simulation:
                 self.restoreFiles[time] = []
             self.restoreFiles[time].append(file)
 
+    #--------------------------------------------------------------------------
+
     def restore(self, name):
+        """ Just a reference
+        """
         tools.restore(name)
 
     #--------------------------------------------------------------------------
 
     def debug(self, procs=4, valgrind=False):
-        """
-        Call the 'tools' 'debug' routine with proper arguments. See doc there.
+        """ Call the 'tools' 'debug' routine with proper arguments. See doc there.
         """
         tools.setMPI(self.platform)
         tools.debug(procs, self.directory, sys.stdout,
@@ -745,11 +740,10 @@ class Simulation:
     #--------------------------------------------------------------------------
 
     def run(self, procs=4, out=sys.stdout):
-        """
-        Call the 'tools' 'run' routine with proper arguments. See doc there.
+        """ Call the 'tools' 'run' routine with proper arguments. See doc there.
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::run()")
+            self.say.message_debug(self.CLASS_NAME+"::run()")
 
         if out == None:
             out = open(os.devnull,'w')
@@ -764,8 +758,7 @@ class Simulation:
     #--------------------------------------------------------------------------
 
     def analyse(self):
-        """
-        Call the 'tools' 'analyse' routine with proper arguments. See doc there.
+        """ Call the 'tools' 'analyse' routine with proper arguments. See doc there.
         """
         tools.analyse(self.directory, sys.stdout, False)
 
@@ -775,14 +768,14 @@ class Simulation:
         """ Read MD snapshot files.
         Returns an array with the structure a[time][particle] = [x,y,z,...]
         """
-        if self.outputDir == "":
-            self.error("Output doesn't seem to be loaded")
+        if not self.outputLoaded:
+            self.say.error("Output doesn't seem to be loaded")
             return -1
 
         filenames = glob.glob(self.outputDir+"/md-cfg_output*")
         filenames = sorted(filenames)
 
-        #determine the number of particles (we assume it stays constant!)
+        # determine the number of particles (we assume it stays constant!)
         pn = 0
         f = open(filenames[0],'r')
         for l in f:
@@ -800,36 +793,12 @@ class Simulation:
                 md_data[ti][pi] = ls
                 pi += 1
             ti += 1
-        #print(md_data)
-        #md_data = np.sort(md_data, order='f0', axis=0)
-        #print(md_data)
         return md_data
 
     #--------------------------------------------------------------------------
 
-    def message(self, str):
-        print('s_('+self.name+'): '+str)
-
-    #--------------------------------------------------------------------------
-
-    def warning(self, str):
-        print('s_('+self.name+'): Warning! '+str)
-
-    #--------------------------------------------------------------------------
-
-    def error(self, str):
-        print('s_('+self.name+'): !ERROR! '+str)
-
-    #--------------------------------------------------------------------------
-
-    def message_debug(self, str):
-        print('s_('+self.name+'): (debug) '+str)
-
-    #--------------------------------------------------------------------------
-
     def __str__(self):
-        """
-        Called by print(instance)
+        """ Called by print(instance)
         """
         return  "Simulation instance:\n"\
                 "\tname: "+self.name+"\n"\
@@ -838,4 +807,8 @@ class Simulation:
                 "\tinputFile: "+self.inputFile+"\n"\
                 "\tinputDicts: "+str(self.inputDicts)
 
-#==============================================================================
+if __name__ == '__main__':
+    # Tests
+    p = Project()
+    p.new('test')
+    s = Simulation()

@@ -319,6 +319,47 @@ def inputGetDictionaries(_inputFileName, _variables={}):
 # UTILS
 # ============================================================================
 
+class Say:
+	WARNING = '\033[93m'
+	ERROR = '\033[91m'
+	ENDL = '\033[0m'
+	obj = None
+	def __init__(self, obj):
+		self.obj = obj
+	#--------------------------------------------------------------------------
+
+	def message(self, str):
+		if obj == None:
+			print(str)
+		else:
+			print('p_('+self.obj.name+'): '+str)
+
+	#--------------------------------------------------------------------------
+
+	def message_debug(self, str):
+		if obj == None:
+			print('(Debug) '+str)
+		else:
+			print('(Debug) p_('+self.obj.name+'): '+str)
+
+	#--------------------------------------------------------------------------
+
+	def error(self, str):
+		if obj == None:
+			print(self.ERROR+'Error: '+self.ENDL+str)
+		else:
+			print('p_('+self.obj.name+'): '+self.ERROR+'Error: '+self.ENDL+str)
+
+	#--------------------------------------------------------------------------
+
+	def warning(self, str):
+		if obj == None:
+			print(self.WARNING+'Warning! '+self.ENDL+str)
+		else:
+			print(self.WARNING+'p_('+self.obj.name+'): Warning! '+self.ENDL+str)
+
+	#--------------------------------------------------------------------------
+
 def setMPI(platform):
 	global mpirundir
 
