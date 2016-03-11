@@ -16,7 +16,7 @@ import tools # see module
 verbose = False
 
 # Global constants
-DATA_DIR = "/data/home/nicorivas/Data"
+DATA_DIR = "/data/nicorivas/"
 #DATA_DIR = "/homec/jiek11/jiek1101/Data"
 
 SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
@@ -506,7 +506,7 @@ class Simulation:
         the executable file if it was compiled
         """
         if self.DEBUG:
-            print(self.CLASS_NAME+"::commit()")
+            self.say.message_debug(self.CLASS_NAME+"::commit()")
 
         if not os.path.exists(self.directory):
             if restore:
@@ -772,7 +772,7 @@ class Simulation:
             self.say.error("Output doesn't seem to be loaded")
             return -1
 
-        filenames = glob.glob(self.outputDir+"/md-cfg_output*")
+        filenames = glob.glob(self.directory+'/'+self.outputDir+"/md-cfg_output*")
         filenames = sorted(filenames)
 
         # determine the number of particles (we assume it stays constant!)

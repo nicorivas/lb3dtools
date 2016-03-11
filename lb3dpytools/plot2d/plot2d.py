@@ -9,9 +9,9 @@ import lb3dpytools.sims
 import lb3dpytools.tools
 
 colors = ['r','g','b','y']*10
-say = tools.Say(None)
+say = lb3dpytools.tools.Say(None)
 
-def mdtrajectory(sim, pn=0, show=0):
+def mdtrajectory(sim, pns=0, show=0):
 	"""Plot the trajectory of a particle in three figures, x-y, x-z and y-z.
 		@sim: Simulation object
 		@pns: Particle number(s) (int or list)
@@ -28,11 +28,10 @@ def mdtrajectory(sim, pn=0, show=0):
 	md_data = sim.getMDData()
 
 	plt.figure(figsize=(20,10))
-	for pn in enumerate(pns):
-		md_datap = md_data[:,pn,:]
-		xs = md_datap[:,0]
-		ys = md_datap[:,1]
-		zs = md_datap[:,2]
+	for c, pn in enumerate(pns):
+		xs = md_data[:,pn,0]
+		ys = md_data[:,pn,1]
+		zs = md_data[:,pn,2]
 
 		plt.subplot(1,3,1)
 		plt.gca().set_aspect('equal')
@@ -451,7 +450,7 @@ def getField(sim, fieldname, time=0, verbose=0):
 	field = sim.getField(fieldname, t=time)
 
 	if isinstance(field, int):
-		say.error('Field not found')
+		say.error('Field \''+fieldname+'\' not found')
 		exit(0)
 
 	fmin = np.min(field)
