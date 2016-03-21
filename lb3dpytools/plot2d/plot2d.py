@@ -464,7 +464,7 @@ def getField(sim, fieldname, time=0, verbose=0):
 
 	return field
 
-def ct_scan(sim, field, dir=0, vmin=0, vmax=0, vminp=1.0, vmaxp=1.0, title='', cuts=[]):
+def ct_scan(sim, field, dir=0, vmin=0, vmax=0, vminp=1.0, vmaxp=1.0, title='', cuts=[], colorbar=1):
 	""" Series of density plots of cuts (slices) of a 3D field in the direction
 	specified by dir.
 	"""
@@ -493,15 +493,15 @@ def ct_scan(sim, field, dir=0, vmin=0, vmax=0, vminp=1.0, vmaxp=1.0, title='', c
 	for c, n in enumerate(values):
 		plt.subplot(w,h,c+1)
 		if dir == 0:
-			core.pdensity(field[n,:,:],vmin,vmax)
+			core.pdensity(field[n,:,:],vmin,vmax,colorbar)
 			plt.xlabel('y')
 			plt.ylabel('z')
 		elif dir == 1:
-			core.pdensity(field[:,n,:],vmin,vmax)
+			core.pdensity(field[:,n,:],vmin,vmax,colorbar)
 			plt.xlabel('x')
 			plt.ylabel('z')
 		elif dir == 2:
-			core.pdensity(field[:,:,n],vmin,vmax)
+			core.pdensity(field[:,:,n],vmin,vmax,colorbar)
 			plt.xlabel('x')
 			plt.ylabel('y')
 		if title is not '':

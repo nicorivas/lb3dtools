@@ -19,13 +19,13 @@ verbose = False
 DATA_DIR = "/data/nicorivas/"
 #DATA_DIR = "/homec/jiek11/jiek1101/Data"
 
-SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
+#SOURCE_DIR = "/data/home/nicorivas/Code/lb3d/src"
 #SOURCE_DIR = "/homec/jiek11/jiek1101/Code/lb3d/src"
-#SOURCE_DIR = "/Users/local_admin/Code/lb3d/src"
+SOURCE_DIR = "/Users/local_admin/Code/lb3d/src"
 
-CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
+#CONFIG_DIR = "/data/home/nicorivas/Code/lb3d"
 #CONFIG_DIR = "/homec/jiek11/jiek1101/Code/lb3d"
-#CONFIG_DIR = "/Users/local_admin/Code/lb3d"
+CONFIG_DIR = "/Users/local_admin/Code/lb3d"
 
 class Project:
     """Class to hold collections of simulation, defined by a directory.
@@ -75,7 +75,6 @@ class Project:
             os.makedirs(self.directory)
         except OSError as e:
             self.say.error('Could create directory when creating project: {}'.format(e))
-            exit(0)
 
         # Log and project files
         self.writeToFile("Project file\n")
@@ -89,25 +88,32 @@ class Project:
         """Loads a project by name.
         Given a name, we know the directory to look for, and we add all
         simulations to the sims array as Simulation objects.
+            @name: name of the directory
+            -returns: project object
         """
         if self.DEBUG:
             self.say.message_debug(self.CLASS_NAME+"::load(name="+name+")")
 
         self.name = name
+        
         self.directory = DATA_DIR+"/"+name
-        if not os.path.exists(self.directory):
-            self.say.error("Project does not exist ("+self.directory+")!")
-            return 1
+        if not os.path.isdir(self.directory):
+            self.say.error('Project directory not found')
+            raise IOError('Project directory not found')
+
         self.projectFilename = self.directory+'/project'
-        if not os.path.isfile(self.projectFilename):
-            self.say.error("Project file not found."
-                    " Are you sure is this a project directory? Aborting")
-            return 1
+        try:
+            f = open(self.projectFilename, 'r')
+        except IOError as ex:
+            self.say.error('Project file not found: {}'.format(ex))
+            raise
+
         self.historyFilename = self.directory+'/history'
-        if not os.path.isfile(self.historyFilename):
-            self.say.error("History file not found."
-                    " Are you sure is this a project directory? Aborting")
-            return 1
+        try:
+            f = open(self.historyFilename, 'r')
+        except IOError as ex:
+            self.say.error('History file not found: {}'.format(ex))
+            raise
 
         if verbose:
             self.say.message("Loaded ('"+self.directory+"')")
@@ -672,17 +678,19 @@ class Simulation:
         if out == None:
             out = open(os.devnull,'w')
 
-        r = 1
         if not self.compiled:
-            r = tools.compile(self.platform, self.flags, CONFIG_DIR, SOURCE_DIR,
-                out, clean=clean, debug=debug, verbose=False)
-            if r != 0:
-                self.project.writeToHistory("Error: Compilation failed",sim=self.name)
-            else:
+            try:
+                tools.compile(self.platform, self.flags, CONFIG_DIR, SOURCE_DIR,
+                    out, clean=clean, debug=debug, verbose=False)
                 print("-"*80)
                 self.project.writeToHistory("Compiled source with flags "+str(self.flags),sim=self.name)
                 self.compiled = True
-        return r
+            except tools.CompileError as e:
+                self.project.writeToHistory("Error: Compilation failed",sim=self.name)
+                self.say.error(str(e))
+                raise
+
+        return self.compiled
 
     #--------------------------------------------------------------------------
 

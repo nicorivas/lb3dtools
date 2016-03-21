@@ -16,6 +16,9 @@ G_elec = False # if compiled with flag -DELEC
 # ==========================================================================
 # COMPILE
 # ==========================================================================
+class CompileError(Exception):
+	pass
+
 def compile(platform, flags, configDir, sourceDir, out, clean=True, 
 		verbose=False, debug=False):
 	"""
@@ -27,19 +30,23 @@ def compile(platform, flags, configDir, sourceDir, out, clean=True,
 		print("Compiling: "+flags)
 
 	flags_ = string.split(flags)
+
+	if not os.path.isfile(configDir+'/configLB3D.sh'):
+		raise IOError('\''+configDir+'/configLB3D.sh\' not found')
+
 	if debug:
 		flags_.append("-DDEBUG")
 
 	if clean:
 		e = subprocess.call(["./configLB3D.sh", "CLEAN"], cwd=configDir, 
-				stdout=out, stderr=out)
+			stdout=out, stderr=out)
 		e = subprocess.call(["./configLB3D.sh", "CONFIG", platform]+flags_, 
-				cwd=configDir, stdout=out, stderr=out)
+			cwd=configDir, stdout=out, stderr=out)
+	
 	e = subprocess.call(["./configLB3D.sh", "MAKE-NODOC"], cwd=configDir, 
 			stdout=out, stderr=out)
-
 	if e != 0:
-		print("ERROR! Compiling failed!")
+		raise CompileError('Compilation command failed')
 	
 	return e
 
