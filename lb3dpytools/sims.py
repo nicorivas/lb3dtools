@@ -148,7 +148,7 @@ class Project:
         Notice that simulations are also loaded (.load is called in Simulation)
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::addSimulation(path="+path+")")
+            self.say.message_debug(self.CLASS_NAME+"::addSimulation(path="+path+")")
 
         if not os.path.exists(path):
             self.error("While adding simulation: path not found ("+path+")")
@@ -302,7 +302,7 @@ class Simulation:
         from the input files, and the filenames of the output data
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::load(path="+path+")")
+            self.say.message_debug(self.CLASS_NAME+"::load(path="+path+")")
 
         if not os.path.isdir(path):
             self.say.error("While loading: directory does not exist! ("+path+")")
@@ -448,7 +448,7 @@ class Simulation:
         else:
             self.warning("Flags were not read from file; already set")
 
-        self.message("Template loaded: '"+path+"'")
+        self.say.message("Template loaded: '"+path+"'")
 
     #--------------------------------------------------------------------------
 
@@ -461,7 +461,7 @@ class Simulation:
           @format: for different file types
         """
         if self.DEBUG:
-            self.message_debug(self.CLASS_NAME+"::getField(fieldname="+fieldname+")")
+            self.say.message_debug(self.CLASS_NAME+"::getField(fieldname="+fieldname+")")
 
         if self.fieldFiles.keys() == []:
             self.say.error("Looks like you haven't loaded the output, use loadOutput")
@@ -643,7 +643,7 @@ class Simulation:
 
         self.project.writeToHistory("Batch file created",sim=self.name)
 
-        self.message("Adding to queue:")
+        self.say.message("Adding to queue:")
 
         self.project.writeToHistory("Running batch file...",sim=self.name)
 
@@ -666,7 +666,7 @@ class Simulation:
         if self.DEBUG:
             self.say.message_debug(self.CLASS_NAME+"::compile()")
 
-        self.message("Compiling...")
+        self.say.message("Compiling...")
         print("-"*80)
 
         if out == None:
